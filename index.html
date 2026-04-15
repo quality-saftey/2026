@@ -25,7 +25,38 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f4f7fa;color:#333;}
 .view{display:none;animation:fadeIn 0.3s ease;}
 .view.active{display:block;}
 @keyframes fadeIn{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:translateY(0);}}
+/* =========================================
+   모바일(핸드폰) 화면 최적화 (반응형 CSS)
+   ========================================= */
+@media (max-width: 768px) {
+  /* 전체 여백 줄이기 */
+  .content { padding: 10px; }
+  .header { padding: 12px 16px; }
+  .cal-top { padding: 12px 16px; margin-bottom: 12px; }
+  
+  /* 달력 요일 및 날짜 칸 축소 */
+  .weekday { padding: 6px; font-size: 11px; }
+  .day-cell { min-height: 70px; padding: 4px; }
+  .day-num { font-size: 11px; margin-bottom: 3px; }
+  .day-cell.today .day-num { width: 20px; height: 20px; font-size: 11px; }
 
+  /* 일정 태그(라벨) 크기 축소 */
+  .ev-tag {
+    font-size: 9px;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    letter-spacing: -0.5px;
+  }
+
+  /* 테이블/캘린더 폰트 축소 및 가로 스크롤 허용 */
+  .cal-title { font-size: 16px; }
+  .tbl-header { padding: 12px; }
+  .search-bar { width: 100%; margin-bottom: 10px; }
+  
+  /* 탭 메뉴 스크롤 부드럽게 */
+  .tabs { padding: 0 10px; }
+  .tab { padding: 12px 14px; font-size: 13px; }
+}
 /* 캘린더 및 공통 버튼 */
 .cal-top{display:flex;align-items:center;justify-content:space-between;
   background:white;padding:16px 24px;border-radius:12px;
@@ -68,7 +99,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f4f7fa;color:#333;}
 .annual-table td{border:1px solid #e2e8f0;}
 .annual-table .title-row td{background:#1a3a5c;color:white;text-align:center;font-size:16px;font-weight:bold;padding:14px;}
 .annual-table .month-row td{background:#f8fafc;color:#334155;text-align:center;font-weight:bold;font-size:14px;padding:10px 4px;}
-.annual-table .date-row td{background:#f1f5f9;color:#e67e22;text-align:center;font-weight:bold;font-size:13px;padding:8px 4px;}
+.annual-table .count-row td{background:#f1f5f9;color:#475569;text-align:center;font-weight:bold;font-size:12px;padding:8px 4px;}
 .annual-table .data-row td{text-align:center;vertical-align:top;padding:6px 4px;min-height:30px;}
 .annual-table .data-row:hover td{background:#f8fafc;}
 
@@ -179,7 +210,6 @@ tr:hover td{background:#f8fafc;}
         <button class="nav-btn" onclick="changeMonth(1)">다음달 ▶</button>
       </div>
     </div>
-    <!-- 캘린더 상단 현장 범례 삭제됨 -->
     <div class="cal-grid">
       <div class="cal-weekdays">
         <div class="weekday">일</div><div class="weekday">월</div>
@@ -208,7 +238,6 @@ tr:hover td{background:#f8fafc;}
 
   <!-- 현장별 일정 뷰 (검색창 통합) -->
   <div id="view-site" class="view">
-    <!-- 버튼 그룹(현장 필터) 삭제됨 -->
     <div class="tbl-wrap">
       <div class="tbl-header">
         <h3 id="site-tbl-title">전체 현장 점검 일정</h3>
@@ -296,7 +325,7 @@ tr:hover td{background:#f8fafc;}
   </div>
 </div>
 
-<!-- 엑셀 업로드 모달 (Drag & Drop 추가) -->
+<!-- 엑셀 업로드 모달 -->
 <div class="overlay" id="upload-modal">
   <div class="modal">
     <div class="modal-hd">
@@ -440,7 +469,7 @@ function initFirestore(){
 function refresh(){
   if(curTab==='calendar') renderCalendar();
   if(curTab==='annual')   renderAnnual();
-  if(curTab==='site')     renderSiteTable(); // 현장필터 삭제됨, 테이블만 랜더링
+  if(curTab==='site')     renderSiteTable();
   if(curTab==='manage')   renderSiteCards();
 }
 
@@ -470,7 +499,6 @@ window.goToday = () => {
 
 function renderCalendar(){
   SS('cal-title').textContent = `${curYear}년 ${curMonth+1}월`;
-  // 상단 범례 삭제됨
 
   const first=new Date(curYear,curMonth,1).getDay();
   const last=new Date(curYear,curMonth+1,0).getDate();
@@ -503,7 +531,6 @@ function renderCalendar(){
     const isTod = !other && today.getFullYear()===curYear && today.getMonth()===curMonth && today.getDate()===dn;
     const dayEvs = events.filter(e=>e.date===ds);
     
-    // 달력 내부 태그에는 현장명을 남겨 구별할 수 있도록 함
     const evHtml = dayEvs.map(e=>{
       const s = getSite(e.siteId);
       if(!s) return '';
@@ -520,15 +547,32 @@ function renderCalendar(){
 
 window.changeYear = d => { annualYear+=d; renderAnnual(); };
 
+// ============================================
+// 연간 일정표 렌더링 (월별 점검 횟수 카운트 반영)
+// ============================================
 function renderAnnual(){
   SS('annual-title').textContent = `${annualYear}년 일정`;
   const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   
+  // 1. 해당 연도의 각 월별 총 이벤트 건수 계산
+  const monthlyCounts = months.map((_, mi) => {
+    return events.filter(e => e.date && e.date.startsWith(`${annualYear}-${String(mi+1).padStart(2,'0')}`)).length;
+  });
+  
+  // 총 합계 계산
+  const totalCount = monthlyCounts.reduce((a, b) => a + b, 0);
+
+  // 2. 테이블 헤더와 카운트 행 추가 (rowspan=2 로 현장명 병합)
   let html = `
-    <tr class="title-row"><td colspan="13">${annualYear}년 현장점검 일정</td></tr>
+    <tr class="title-row"><td colspan="13">${annualYear}년 현장점검 일정 (총 ${totalCount}건)</td></tr>
     <tr class="month-row">
-      <td style="background:#1a3a5c;color:white;min-width:120px;">현장명</td>
+      <td style="background:#1a3a5c;color:white;min-width:120px;vertical-align:middle;" rowspan="2">현장명</td>
       ${months.map(m=>`<td>${m}</td>`).join('')}
+    </tr>
+    <tr class="count-row">
+      ${monthlyCounts.map(cnt => `
+        <td>${cnt > 0 ? `<span style="color:#2563eb;font-weight:900;font-size:13px;">${cnt}</span>건` : '<span style="color:#94a3b8">-</span>'}</td>
+      `).join('')}
     </tr>`;
 
   sites.forEach(site=>{
@@ -566,14 +610,12 @@ function buildSiteRows(site, year){
   return Array.from({length:maxRows}, (_,ri)=>me.map(m=>m[ri]?[m[ri]]:null));
 }
 
-// 현장별 일정 테이블 랜더링 (통합 검색 반영)
+// 현장별 일정 테이블 랜더링
 window.renderSiteTable = function() {
   const searchKeyword = SS('search-input').value.toLowerCase().trim();
   
-  // 전체 일정을 날짜순 정렬
   let rows = [...events].sort((a,b)=>a.date.localeCompare(b.date));
   
-  // 통합 검색 필터 적용 (현장명 포함)
   if(searchKeyword) {
     rows = rows.filter(e => {
       const s = getSite(e.siteId);
@@ -754,7 +796,7 @@ window.showDetail = function(id, e){
 window.editFromDetail = () => openEditModal(curDetailId);
 window.deleteFromDetail = () => { delEvent(curDetailId); closeModal('detail-modal'); };
 
-/* 엑셀 업로드 (Drag & Drop 지원) */
+/* 엑셀 업로드 */
 window.openUploadModal = function(){
   SS('upload-preview').style.display='none';
   SS('btn-upload-confirm').style.display='none';

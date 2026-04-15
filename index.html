@@ -225,12 +225,14 @@ tr:hover td{background:#f8fafc;}
     </div>
   </div>
   
-  <!-- 연간 일정표 뷰 -->
+   <!-- 연간 일정표 뷰 -->
   <div id="view-annual" class="view">
     <div class="cal-top">
       <button class="nav-btn" onclick="changeYear(-1)">◀ 이전년도</button>
       <div class="cal-title" id="annual-title"></div>
       <div class="cal-btns">
+        <!-- 🔍 검색창 추가 (기본적으론 전체 표시, 입력시 해당 현장만 표시) -->
+        <input type="text" id="annual-search-input" class="search-bar" style="width:180px; margin-bottom:0;" placeholder="🔍 현장명 검색..." onkeyup="renderAnnual()">
         <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
         <button class="nav-btn" onclick="changeYear(1)">다음년도 ▶</button>
       </div>
@@ -552,21 +554,34 @@ function renderCalendar(){
 window.changeYear = d => { annualYear+=d; renderAnnual(); };
 
 // ============================================
-// 연간 일정표 렌더링 (월별 점검 횟수 카운트 반영)
+// 연간 일정표 렌더링 (기본: 전체 표시 / 검색시: 해당 현장만 필터링)
 // ============================================
-function renderAnnual(){
+window.renderAnnual = function(){
   SS('annual-title').textContent = `${annualYear}년 일정`;
   const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
   
-  // 1. 해당 연도의 각 월별 총 이벤트 건수 계산
+  // 1. 검색어 가져오기
+  const searchInput = SS('annual-search-input');
+  const searchKeyword = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+  // 2. 검색어가 없으면 '전체 현장', 있으면 '검색한 현장'만 필터링
+  let filteredSites = sites;
+  if(searchKeyword) {
+    filteredSites = sites.filter(s => s.name.toLowerCase().includes(searchKeyword));
+  }
+
+  // 3. 화면에 보여질 현장들의 일정만 모으기
+  const filteredEvents = events.filter(e => filteredSites.some(fs => fs.id === e.siteId));
+  
+  // 4. 월별 총 점검 횟수 계산 (검색된 현장 기준)
   const monthlyCounts = months.map((_, mi) => {
-    return events.filter(e => e.date && e.date.startsWith(`${annualYear}-${String(mi+1).padStart(2,'0')}`)).length;
+    return filteredEvents.filter(e => e.date && e.date.startsWith(`${annualYear}-${String(mi+1).padStart(2,'0')}`)).length;
   });
   
   // 총 합계 계산
   const totalCount = monthlyCounts.reduce((a, b) => a + b, 0);
 
-  // 2. 테이블 헤더와 카운트 행 추가 (rowspan=2 로 현장명 병합)
+  // 테이블 헤더 만들기
   let html = `
     <tr class="title-row"><td colspan="13">${annualYear}년 현장점검 일정 (총 ${totalCount}건)</td></tr>
     <tr class="month-row">
@@ -579,7 +594,8 @@ function renderAnnual(){
       `).join('')}
     </tr>`;
 
-  sites.forEach(site=>{
+  // 현장 목록 테이블에 그리기
+  filteredSites.forEach(site=>{
     const rows = buildSiteRows(site, annualYear);
     rows.forEach((row, ri)=>{
       html += `<tr class="data-row">`;
@@ -602,7 +618,11 @@ function renderAnnual(){
     });
   });
 
-  if(!sites.length) html += `<tr><td colspan="13" style="padding:40px;color:#94a3b8;">등록된 현장이 없습니다.</td></tr>`;
+  // 검색 결과가 없을 경우 메시지 표시
+  if(!filteredSites.length) {
+    html += `<tr><td colspan="13" style="padding:40px;color:#94a3b8;text-align:center;">${searchKeyword ? '검색된 현장이 없습니다.' : '등록된 현장이 없습니다.'}</td></tr>`;
+  }
+  
   SS('annual-table').innerHTML=html;
 }
 

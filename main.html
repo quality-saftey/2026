@@ -388,7 +388,8 @@ tr:hover td{background:#f8fafc;}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+  
 const firebaseConfig = {
   apiKey: "AIzaSyDK29sJkXXNKhlGS6Ps8Ap3h9tIbqXjaTI",
   authDomain: "schedule-9b001.firebaseapp.com",
@@ -400,7 +401,28 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
+const auth = getAuth(app);
 
+onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // 로그인한 사람이면 콘솔에 환영인사만 찍고 조용히 넘어갑니다.
+        console.log("로그인 확인됨!", user.email); 
+      } else {
+        // 로그인 안 했으면 경고창 띄우고 현관문(index.html)으로 쫓아냄!
+        alert("로그인이 필요합니다!");
+        window.location.href = "index.html"; 
+      }
+    });
+
+document.getElementById("logoutBtn").addEventListener("click", () => {
+      signOut(auth).then(() => {
+        alert("로그아웃 되었습니다.");
+        window.location.href = "index.html"; 
+      });
+    });
+
+ <button id="logoutBtn">로그아웃</button>
+  
 // 색상 팔레트
 const PALETTE = [
   '#1a3a5c','#2980b9','#27ae60','#e74c3c','#f39c12',

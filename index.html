@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>관리자 로그인</title>
+  <style>
+    /* 화면을 예쁘게 꾸며주는 CSS (가운데 정렬 및 깔끔한 디자인) */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f2f5;
+      font-family: 'Arial', sans-serif;
+    }
+    .login-box {
+      background: white;
+      padding: 40px;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 300px;
+    }
+    input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      box-sizing: border-box;
+    }
+    button {
+      width: 100%;
+      padding: 10px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-box">
+    <h2>품질안전실 현장점검 일정표</h2>
+    
+    <!-- 이메일과 비밀번호 입력 칸 -->
+    <input type="email" id="emailInput" placeholder="해안hub이메일">
+    <input type="password" id="passwordInput" placeholder="비밀번호">
+    
+    <!-- 로그인 버튼 -->
+    <button id="loginBtn">로그인 하기</button>
+  </div>
+
+  <!-- 파이어베이스 자바스크립트 코드 (type="module" 필수!) -->
+  <script type="module">
+    // 1. 파이어베이스 도구들 가져오기
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // 🔴 [매우 중요] 아래 firebaseConfig의 내용을 질문자님의 파이어베이스 설정값으로 꼭! 바꿔주세요!
+    const firebaseConfig = {
+      apiKey: "AIzaSyDK29sJkXXNKhlGS6Ps8Ap3h9tIbqXjaTI",
+      authDomain: "schedule-9b001.firebaseapp.com",
+      projectId: "schedule-9b001",
+      storageBucket: "schedule-9b001.firebasestorage.app",
+      messagingSenderId: "66557000970",
+      appId: "1:66557000970:web:3ea4f15feff20ffeec4ef3"
+    };
+
+    // 파이어베이스 실행!
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // --------------------------------------------------------
+    // [기능 1] 이미 로그인된 사람이면, 로그인 화면 안 보여주고 바로 메인으로 보내버리기!
+    // --------------------------------------------------------
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // 어? 너 예전에 로그인 했었네? 귀찮게 또 하지 말고 바로 진짜 방으로 가!
+        window.location.href = "main.html"; 
+      }
+    });
+
+    // --------------------------------------------------------
+    // [기능 2] 로그인 버튼 눌렀을 때 아이디/비번 확인하기
+    // --------------------------------------------------------
+    const loginBtn = document.getElementById("loginBtn");
+    
+    loginBtn.addEventListener("click", () => {
+      const email = document.getElementById("emailInput").value;
+      const password = document.getElementById("passwordInput").value;
+
+      // 파이어베이스야, 이 아이디 비번 맞는지 확인해줘!
+      signInWithEmailAndPassword(auth, email, password)
+        .then((userCredential) => {
+          // 성공!
+          alert("로그인 성공! 환영합니다.");
+          window.location.href = "main.html"; // 진짜 사이트(main.html)로 이동!!
+        })
+        .catch((error) => {
+          // 실패! (아이디나 비번 틀림)
+          alert("아이디 또는 비밀번호가 틀렸습니다!");
+          console.error(error);
+        });
+    });
+  </script>
+
+</body>
+</html>

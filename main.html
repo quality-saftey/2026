@@ -204,25 +204,30 @@ tr:hover td{background:#f8fafc;}
   <div class="tab" onclick="switchTab('manage')">⚙️ 현장 관리</div>
 </div>
 <div class="content">
-  <!-- 캘린더 뷰 -->
-  <div id="view-calendar" class="view active">
+   <!-- 연간 일정표 뷰 -->
+  <div id="view-annual" class="view">
     <div class="cal-top">
-      <button class="nav-btn" onclick="changeMonth(-1)">◀ 이전달</button>
-      <div class="cal-title" id="cal-title"></div>
+      <button class="nav-btn" onclick="changeYear(-1)">◀ 이전년도</button>
+      <div class="cal-title" id="annual-title"></div>
       <div class="cal-btns">
-        <button class="nav-btn" onclick="goToday()">오늘</button>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <!-- 🏷️ 카테고리 필터 드롭다운 추가 -->
+          <select id="annual-category-filter" class="search-bar" style="width:110px; margin-bottom:0; cursor:pointer;" onchange="renderAnnual()">
+            <option value="">전체 분류</option>
+            <option value="공공">공공</option>
+            <option value="주택">주택</option>
+            <option value="민간">민간</option>
+            <option value="미지정">미지정</option>
+          </select>
+          <!-- 🔍 기존 텍스트 검색창 -->
+          <input type="text" id="annual-search-input" class="search-bar" style="width:160px; margin-bottom:0;" placeholder="🔍 현장명 검색..." onkeyup="renderAnnual()">
+        </div>
         <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
-        <button class="nav-btn" onclick="changeMonth(1)">다음달 ▶</button>
+        <button class="nav-btn" onclick="changeYear(1)">다음년도 ▶</button>
       </div>
     </div>
-    <div class="cal-grid">
-      <div class="cal-weekdays">
-        <div class="weekday">일</div><div class="weekday">월</div>
-        <div class="weekday">화</div><div class="weekday">수</div>
-        <div class="weekday">목</div><div class="weekday">금</div>
-        <div class="weekday">토</div>
-      </div>
-      <div class="cal-days" id="cal-days"></div>
+    <div class="annual-wrap">
+      <table class="annual-table" id="annual-table"></table>
     </div>
   </div>
   
@@ -292,7 +297,7 @@ tr:hover td{background:#f8fafc;}
       <input type="hidden" id="edit-id">
       <div class="fg"><label>📅 날짜 *</label><input type="date" id="inp-date"></div>
       <div class="fg"><label>🏗️ 현장명 *</label><select id="inp-site"></select></div>
-      <div class="fg"><label>🔖 PJ Code</label><input type="text" id="inp-pjcode" placeholder="예) PJ-2025-001" maxlength="50"></div>
+      <div class="fg"><label>🔖 PJ Code</label><input type="text" id="inp-pjcode" placeholder="예) 26000" maxlength="50"></div>
       <div class="fg"><label>🔍 점검유형 *</label>
         <select id="inp-type">
           <option value="">유형 선택</option>
@@ -321,6 +326,20 @@ tr:hover td{background:#f8fafc;}
       <input type="hidden" id="site-edit-id">
       <div class="fg"><label>🏗️ 현장 이름 *</label>
         <input type="text" id="inp-site-name" placeholder="예) 강남현장, 1공구" maxlength="30"></div>
+      
+      <!-- 새로 추가된 3가지 항목 -->
+      <div class="fg"><label>🏷️ 현장 분류</label>
+        <select id="inp-site-category">
+          <option value="">분류 선택</option>
+          <option>공공</option><option>주택</option><option>민간</option>
+        </select>
+      </div>
+      <div class="fg"><label>🧑‍💼 단장님 성함 (연락처)</label>
+        <input type="text" id="inp-site-director" placeholder="예) 홍길동 (010-1234-5678)" maxlength="50"></div>
+      <div class="fg"><label>📍 현장사무소 위치</label>
+        <input type="text" id="inp-site-location" placeholder="예) 서울시 강남구 테헤란로 123" maxlength="100"></div>
+      <!-- // 새로 추가된 항목 끝 -->
+
       <div class="fg"><label>🎨 색상 선택 *</label>
         <div style="display:flex;gap:10px;flex-wrap:wrap;" id="color-picker"></div>
       </div>
@@ -341,8 +360,9 @@ tr:hover td{background:#f8fafc;}
     </div>
     <div class="modal-body">
       <div class="info-box">
-        📋 <b>엑셀 양식 안내</b><br>
+        📋 <b>엑셀 양식 안내 (중복 데이터는 자동 덮어쓰기 됩니다)</b><br><br>
         A열: 현장명 | B열: 담당자 | C열: 날짜 | D열: 점검유형 | E열: PJ Code<br>
+        <span style="color:#e74c3c;font-weight:bold;">F열: 분류(공공/주택/민간) | G열: 단장님(연락처) | H열: 현장위치</span><br>
         (날짜형식: YYYY-MM-DD 권장)
       </div>
       <div class="upload-area" id="drop-zone" onclick="document.getElementById('file-input').click()">
@@ -365,7 +385,7 @@ tr:hover td{background:#f8fafc;}
 
 <!-- 상세 모달 -->
 <div class="overlay" id="detail-modal">
-  <div class="modal" style="width:400px;">
+  <div class="modal" style="width:450px;">
     <div class="modal-hd">
       <h3>📋 점검 상세 정보</h3>
       <button class="modal-x" onclick="closeModal('detail-modal')">✕</button>
@@ -373,7 +393,7 @@ tr:hover td{background:#f8fafc;}
     <div class="modal-body" id="detail-body" style="padding:0;"></div>
     <div class="modal-ft" style="justify-content:center;">
       <button class="btn-cancel" onclick="closeModal('detail-modal')">닫기</button>
-      <button class="btn-save" style="background:#3b82f6;" onclick="editFromDetail()">수정</button>
+      <button class="btn-save" style="background:#3b82f6;" onclick="editFromDetail()">일정 수정</button>
       <button class="btn-save" style="background:#ef4444;" onclick="deleteFromDetail()">삭제</button>
     </div>
   </div>
@@ -574,26 +594,47 @@ function renderCalendar(){
 
 window.changeYear = d => { annualYear+=d; renderAnnual(); };
 
+// ============================================
+// 연간 일정표 렌더링 (카테고리 필터 + 검색 반영)
+// ============================================
 window.renderAnnual = function(){
   SS('annual-title').textContent = `${annualYear}년 일정`;
   const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  
+  // 1. 검색어 및 카테고리 값 가져오기
   const searchInput = SS('annual-search-input');
   const searchKeyword = searchInput ? searchInput.value.toLowerCase().trim() : '';
   
+  const categoryFilter = SS('annual-category-filter');
+  const selCategory = categoryFilter ? categoryFilter.value : '';
+
+  // 2. 필터링 (카테고리 필터 -> 텍스트 검색 순서로 적용)
   let filteredSites = sites;
-  if(searchKeyword) {
-    filteredSites = sites.filter(s => s.name.toLowerCase().includes(searchKeyword));
+  
+  if(selCategory) {
+    filteredSites = filteredSites.filter(s => {
+      const c = s.category || '미지정';
+      return c === selCategory;
+    });
   }
+  
+  if(searchKeyword) {
+    filteredSites = filteredSites.filter(s => s.name.toLowerCase().includes(searchKeyword));
+  }
+
+  // 3. 월별 총 점검 횟수 계산 (필터링된 현장 기준)
   const filteredEvents = events.filter(e => filteredSites.some(fs => fs.id === e.siteId));
   const monthlyCounts = months.map((_, mi) => {
     return filteredEvents.filter(e => e.date && e.date.startsWith(`${annualYear}-${String(mi+1).padStart(2,'0')}`)).length;
   });
-  
   const totalCount = monthlyCounts.reduce((a, b) => a + b, 0);
+
+  // 4. 테이블 상단 헤더 만들기
   let html = `
-    <tr class="title-row"><td colspan="13">${annualYear}년 현장점검 일정 (총 ${totalCount}건)</td></tr>
+    <tr class="title-row"><td colspan="14">${annualYear}년 현장점검 일정 (총 ${totalCount}건)</td></tr>
     <tr class="month-row">
-      <td style="background:#1a3a5c;color:white;min-width:120px;vertical-align:middle;" rowspan="2">현장명</td>
+      <td style="background:#1a3a5c;color:white;width:60px;vertical-align:middle;border-right:1px solid #3b82f6;" rowspan="2">분류</td>
+      <td style="background:#1a3a5c;color:white;min-width:140px;vertical-align:middle;" rowspan="2">현장명</td>
       ${months.map(m=>`<td>${m}</td>`).join('')}
     </tr>
     <tr class="count-row">
@@ -601,32 +642,73 @@ window.renderAnnual = function(){
         <td>${cnt > 0 ? `<span style="color:#2563eb;font-weight:900;font-size:13px;">${cnt}</span>건` : '<span style="color:#94a3b8">-</span>'}</td>
       `).join('')}
     </tr>`;
-    
-  filteredSites.forEach(site=>{
-    const rows = buildSiteRows(site, annualYear);
-    rows.forEach((row, ri)=>{
-      html += `<tr class="data-row">`;
-      if(ri===0){
-        html += `<td rowspan="${rows.length}" style="background:${hexLight(site.color)};font-weight:bold;color:${hexDark(site.color)};border-left:5px solid ${site.color};">${escapeHTML(site.name)}</td>`;
-      }
-      months.forEach((_, mi)=>{
-        const cell = row[mi];
-        if(cell){
-          html += `<td>${cell.map(e=>`
-            <div class="insp-cell t-${e.type}" onclick="showDetail('${e.id}',event)">
-              ${escapeHTML(e.type).replace('점검','').replace('검사','검')}<br>
-              <span style="font-size:10px;font-weight:normal;opacity:0.8;">${e.date.slice(5).replace('-','/')}</span>
-            </div>`).join('')}</td>`;
-        } else {
-          html += `<td></td>`;
+
+  if(!filteredSites.length) {
+    html += `<tr><td colspan="14" style="padding:40px;color:#94a3b8;text-align:center;">조건에 맞는 현장이 없습니다.</td></tr>`;
+    SS('annual-table').innerHTML=html;
+    return;
+  }
+
+  // 5. 현장을 카테고리별로 그룹핑
+  const catOrder = ['공공', '주택', '민간', '미지정'];
+  const grouped = { '공공':[], '주택':[], '민간':[], '미지정':[] };
+  
+  filteredSites.forEach(s => {
+    let c = s.category;
+    if(!c || !catOrder.includes(c)) c = '미지정';
+    grouped[c].push(s);
+  });
+
+  // 6. 그룹별로 테이블 그리기
+  catOrder.forEach(cat => {
+    const catSites = grouped[cat];
+    if(catSites.length === 0) return;
+
+    const siteRowsData = catSites.map(site => {
+      const rows = buildSiteRows(site, annualYear);
+      return { site, rows };
+    });
+    const catTotalRows = siteRowsData.reduce((sum, data) => sum + data.rows.length, 0);
+
+    siteRowsData.forEach((data, sIndex) => {
+      const { site, rows } = data;
+      rows.forEach((row, rIndex) => {
+        html += `<tr class="data-row">`;
+        
+        // [1열] 분류 셀 병합
+        if(sIndex === 0 && rIndex === 0) {
+          const bg = cat==='공공'?'#2980b9':cat==='주택'?'#27ae60':cat==='민간'?'#8e44ad':'#7f8c8d';
+          html += `<td rowspan="${catTotalRows}" style="background:white;font-weight:bold;color:${bg};border-left:5px solid ${bg};border-right:1px solid #e2e8f0;vertical-align:middle;">
+            ${escapeHTML(cat)}<br><span style="font-size:11px;color:#64748b;">(${catSites.length}EA)</span>
+          </td>`;
         }
+
+        // [2열] 현장명 셀 병합
+        if(rIndex === 0) {
+          html += `<td rowspan="${rows.length}" style="background:${hexLight(site.color)};font-weight:bold;color:${hexDark(site.color)};text-align:left;padding-left:12px;vertical-align:middle;">
+            ${escapeHTML(site.name)}
+            ${site.location ? `<div style="font-size:11px;color:#64748b;font-weight:normal;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">📍 ${escapeHTML(site.location)}</div>` : ''}
+          </td>`;
+        }
+
+        // [3~14열] 월별 일정 셀
+        months.forEach((_, mi)=>{
+          const cell = row[mi];
+          if(cell){
+            html += `<td>${cell.map(e=>`
+              <div class="insp-cell t-${e.type}" onclick="showDetail('${e.id}',event)">
+                ${escapeHTML(e.type).replace('점검','').replace('검사','검')}<br>
+                <span style="font-size:10px;font-weight:normal;opacity:0.8;">${e.date.slice(5).replace('-','/')}</span>
+              </div>`).join('')}</td>`;
+          } else {
+            html += `<td></td>`;
+          }
+        });
+        html += `</tr>`;
       });
-      html += `</tr>`;
     });
   });
-  if(!filteredSites.length) {
-    html += `<tr><td colspan="13" style="padding:40px;color:#94a3b8;text-align:center;">${searchKeyword ? '검색된 현장이 없습니다.' : '등록된 현장이 없습니다.'}</td></tr>`;
-  }
+
   SS('annual-table').innerHTML=html;
 }
 
@@ -684,7 +766,12 @@ function renderSiteCards(){
   grid.innerHTML = sites.map(s=>{
     const cnt = events.filter(e=>e.siteId===s.id).length;
     return `<div class="site-card" style="background:${s.color}">
-      <div class="site-card-name">🏗️ ${escapeHTML(s.name)}</div>
+      <div class="site-card-name">
+        ${s.category ? `<span style="font-size:11px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;vertical-align:middle;margin-right:4px;">${escapeHTML(s.category)}</span>` : ''}
+        🏗️ ${escapeHTML(s.name)}
+      </div>
+      <div style="font-size:12px;opacity:0.9;margin-bottom:4px;">🧑‍💼 ${escapeHTML(s.director||'단장님 정보 없음')}</div>
+      <div style="font-size:12px;opacity:0.9;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📍 ${escapeHTML(s.location||'위치 정보 없음')}</div>
       <div class="site-card-count">등록된 일정: ${cnt}건</div>
       <div class="site-card-btns">
         <button class="btn-ce" onclick="openSiteEdit('${s.id}')">✏️ 수정</button>
@@ -697,6 +784,9 @@ window.openSiteModal = function(){
   SS('site-modal-title').textContent='현장 추가';
   SS('site-edit-id').value='';
   SS('inp-site-name').value='';
+  SS('inp-site-category').value='';
+  SS('inp-site-director').value='';
+  SS('inp-site-location').value='';
   selColor=PALETTE[0]; renderCP();
   SS('site-modal').classList.add('show');
 };
@@ -706,6 +796,9 @@ window.openSiteEdit = function(id){
   SS('site-modal-title').textContent='현장 수정';
   SS('site-edit-id').value=s.id;
   SS('inp-site-name').value=s.name;
+  SS('inp-site-category').value=s.category||'';
+  SS('inp-site-director').value=s.director||'';
+  SS('inp-site-location').value=s.location||'';
   selColor=s.color; renderCP();
   SS('site-modal').classList.add('show');
 };
@@ -724,11 +817,19 @@ window.saveSite = async function(){
   const name = SS('inp-site-name').value.trim();
   if(!name){alert('현장 이름을 입력해주세요.'); return;}
   const editId = SS('site-edit-id').value, id = editId || genId();
-  await setDoc(doc(db,'sites',id), {name, color:selColor});
+  
+  await setDoc(doc(db,'sites',id), {
+    name, 
+    color: selColor,
+    category: SS('inp-site-category').value,
+    director: SS('inp-site-director').value.trim(),
+    location: SS('inp-site-location').value.trim()
+  }, { merge: true });
+  
   closeModal('site-modal');
   toast(editId ? '현장 정보가 수정되었습니다. 💾' : '새 현장이 추가되었습니다. ✨');
 };
-
+  
 window.delSite = async function(id){
   const s = getSite(id);
   const cnt = events.filter(e=>e.siteId===id).length;
@@ -795,16 +896,24 @@ window.showDetail = function(id, e){
   e.stopPropagation(); curDetailId=id;
   const ev = events.find(v=>v.id===id); if(!ev) return;
   const s = getSite(ev.siteId);
+  
   const rowStyle = "display:flex; padding:12px 20px; border-bottom:1px solid #f1f5f9;";
   const dlStyle = "width:90px; font-weight:bold; color:#64748b; font-size:13px; flex-shrink:0;";
   const dvStyle = "font-size:14px; color:#1e293b; flex:1;";
+  
   SS('detail-body').innerHTML=`
+    <div style="background:#f8fafc;padding:12px 20px;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:12px;color:#3b82f6;font-weight:bold;margin-bottom:4px;">${escapeHTML(s?.category||'분류 미지정')}</div>
+      <div style="font-size:16px;font-weight:bold;color:#1e293b;margin-bottom:6px;">🏗️ ${escapeHTML(s?.name||'현장명 없음')}</div>
+      <div style="font-size:13px;color:#475569;">🧑‍💼 단장: ${escapeHTML(s?.director||'-')}</div>
+      <div style="font-size:13px;color:#475569;">📍 위치: ${escapeHTML(s?.location||'-')}</div>
+    </div>
     <div style="${rowStyle}"><div style="${dlStyle}">📅 날짜</div><div style="${dvStyle}">${fmtDate(ev.date)}</div></div>
-    <div style="${rowStyle}"><div style="${dlStyle}">🏗️ 현장</div><div style="${dvStyle}"><b>${escapeHTML(s?.name||'-')}</b></div></div>
     <div style="${rowStyle}"><div style="${dlStyle}">🔖 PJ Code</div><div style="${dvStyle}">${escapeHTML(ev.pjcode||'-')}</div></div>
     <div style="${rowStyle}"><div style="${dlStyle}">🔍 유형</div><div style="${dvStyle}"><span class="insp-cell t-${ev.type}" style="margin:0;">${escapeHTML(ev.type)}</span></div></div>
     <div style="${rowStyle}"><div style="${dlStyle}">👤 담당자</div><div style="${dvStyle}">${escapeHTML(ev.manager||'-')}</div></div>
     <div style="${rowStyle}border:none;"><div style="${dlStyle}">📝 비고</div><div style="${dvStyle};line-height:1.5;">${escapeHTML(ev.memo||'-').replace(/\n/g, '<br>')}</div></div>`;
+  
   SS('detail-modal').classList.add('show');
 };
 
@@ -826,9 +935,7 @@ dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('dragov
 dropZone.addEventListener('drop', (e) => {
   e.preventDefault();
   dropZone.classList.remove('dragover');
-  if(e.dataTransfer.files.length > 0){
-    window.handleFile(e.dataTransfer.files[0]);
-  }
+  if(e.dataTransfer.files.length > 0) window.handleFile(e.dataTransfer.files[0]);
 });
 
 window.handleFile = function(file){
@@ -839,11 +946,14 @@ window.handleFile = function(file){
     const wb = XLSX.read(data, {type:'array', cellDates:true});
     const ws = wb.Sheets[wb.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    
     uploadRows = [];
     const startRow = isNaN(new Date(rows[0]?.[2]).getTime()) ? 1 : 0;
+    
     for(let i=startRow; i<rows.length; i++){
       const r = rows[i];
-      if(!r[0] || !r[2]) continue;
+      if(!r[0] || !r[2]) continue; 
+      
       let dateStr='';
       if(r[2] instanceof Date){
         dateStr = `${r[2].getFullYear()}-${String(r[2].getMonth()+1).padStart(2,'0')}-${String(r[2].getDate()).padStart(2,'0')}`;
@@ -852,23 +962,26 @@ window.handleFile = function(file){
         if(ds.includes('월')&&ds.includes('일')){
           const m = ds.match(/(\d+)월\s*(\d+)일/);
           if(m) dateStr = `${new Date().getFullYear()}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
-        } else if(ds.includes('-')){
+        } else if(ds.includes('-')) {
           dateStr = ds.replace(/\//g, '-');
         }
       }
       if(!dateStr) continue;
+
       uploadRows.push({
         siteName: String(r[0]).trim(),
         manager: String(r[1]).trim(),
         date: dateStr,
         type: String(r[3]).trim() || '정기점검',
-        pjcode: String(r[4]).trim()
+        pjcode: String(r[4]).trim(),
+        category: String(r[5]||'').trim(), // F열
+        director: String(r[6]||'').trim(), // G열
+        location: String(r[7]||'').trim()  // H열
       });
     }
-    if(uploadRows.length===0){
-      alert("읽을 수 있는 데이터가 없습니다. 엑셀 양식을 확인해주세요.");
-      return;
-    }
+    
+    if(uploadRows.length===0){ alert("읽을 수 있는 데이터가 없습니다. 양식을 확인해주세요."); return; }
+
     SS('preview-count').textContent = uploadRows.length;
     SS('preview-list').innerHTML = uploadRows.map(r=>
       `<div style="display:flex;gap:10px;font-size:13px;padding:6px 0;border-bottom:1px solid #f1f5f9;align-items:center;">
@@ -877,6 +990,7 @@ window.handleFile = function(file){
         <span class="insp-cell t-${r.type}" style="margin:0;">${escapeHTML(r.type)}</span>
         <span style="color:#64748b;">👤 ${escapeHTML(r.manager)||'-'}</span>
       </div>`).join('');
+    
     SS('upload-preview').style.display='block';
     SS('btn-upload-confirm').style.display='block';
   };
@@ -886,27 +1000,59 @@ window.handleFile = function(file){
 window.uploadData = async function(){
   if(!uploadRows.length) return;
   const btn = SS('btn-upload-confirm');
-  btn.textContent = '⏳ 등록 중...'; btn.disabled=true;
-  let addedSites=0, addedEvents=0;
+  btn.textContent = '⏳ 등록/업데이트 중...'; btn.disabled=true;
+  
+  let addedSites=0, updatedEvents=0, addedEvents=0;
+  
   for(const row of uploadRows){
+    // 1. 현장(Site) 처리 로직
     let site = sites.find(s=>s.name===row.siteName);
     if(!site){
+      // 기존에 없는 현장이면 새로 생성
       const newId = genId();
       const color = PALETTE[sites.length % PALETTE.length];
-      await setDoc(doc(db,'sites',newId), {name:row.siteName, color});
-      site = {id:newId, name:row.siteName, color};
+      const newSite = { name:row.siteName, color, category:row.category, director:row.director, location:row.location };
+      await setDoc(doc(db,'sites',newId), newSite);
+      site = {id:newId, ...newSite};
       sites.push(site);
       addedSites++;
+    } else {
+      // 이미 있는 현장이면, 엑셀에 새 정보가 있을 때만 기존 현장정보 업데이트 (merge)
+      const updates = {};
+      if(row.category) updates.category = row.category;
+      if(row.director) updates.director = row.director;
+      if(row.location) updates.location = row.location;
+      
+      if(Object.keys(updates).length > 0){
+        await setDoc(doc(db,'sites',site.id), updates, { merge: true });
+      }
     }
-    await setDoc(doc(db,'events',genId()), {
-      date: row.date, siteId: site.id, type: row.type,
-      manager: row.manager, pjcode: row.pjcode, memo: '엑셀 일괄 업로드'
-    });
-    addedEvents++;
+
+    // 2. 일정(Event) 중복 방지 및 덮어쓰기 로직
+    // 완벽히 동일한 '현장+날짜+점검유형'을 가진 일정이 있는지 확인
+    const existingEvent = events.find(e => e.siteId === site.id && e.date === row.date && e.type === row.type);
+
+    if(existingEvent) {
+      // 중복됨 -> 기존 일정을 업데이트 (덮어쓰기)
+      await setDoc(doc(db,'events',existingEvent.id), {
+        manager: row.manager, 
+        pjcode: row.pjcode,
+        memo: '엑셀 데이터로 업데이트됨'
+      }, { merge: true });
+      updatedEvents++;
+    } else {
+      // 중복없음 -> 새 일정 생성
+      await setDoc(doc(db,'events',genId()), {
+        date: row.date, siteId: site.id, type: row.type,
+        manager: row.manager, pjcode: row.pjcode, memo: '엑셀 일괄 업로드'
+      });
+      addedEvents++;
+    }
   }
+  
   closeModal('upload-modal');
   btn.textContent='✅ 일괄 등록하기'; btn.disabled=false;
-  toast(`🎉 현장 ${addedSites}개, 일정 ${addedEvents}건 등록 완료!`);
+  toast(`🎉 현장 신규 ${addedSites}건, 일정 추가 ${addedEvents}건, 일정 업데이트 ${updatedEvents}건 완료!`);
 };
 
 window.exportExcel = function(){

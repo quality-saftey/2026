@@ -204,6 +204,28 @@ tr:hover td{background:#f8fafc;}
   <div class="tab" onclick="switchTab('manage')">⚙️ 현장 관리</div>
 </div>
 <div class="content">
+  <!-- 캘린더 뷰 -->
+  <div id="view-calendar" class="view active">
+    <div class="cal-top">
+      <button class="nav-btn" onclick="changeMonth(-1)">◀ 이전달</button>
+      <div class="cal-title" id="cal-title"></div>
+      <div class="cal-btns">
+        <button class="nav-btn" onclick="goToday()">오늘</button>
+        <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
+        <button class="nav-btn" onclick="changeMonth(1)">다음달 ▶</button>
+      </div>
+    </div>
+    <div class="cal-grid">
+      <div class="cal-weekdays">
+        <div class="weekday">일</div><div class="weekday">월</div>
+        <div class="weekday">화</div><div class="weekday">수</div>
+        <div class="weekday">목</div><div class="weekday">금</div>
+        <div class="weekday">토</div>
+      </div>
+      <div class="cal-days" id="cal-days"></div>
+    </div>
+  </div>
+  
    <!-- 연간 일정표 뷰 -->
   <div id="view-annual" class="view">
     <div class="cal-top">
@@ -263,7 +285,7 @@ tr:hover td{background:#f8fafc;}
         <thead>
           <tr>
             <th>날짜</th><th>현장명</th><th>PJ Code</th>
-            <th>점검유형</th><th>담당자</th><th>비고</th><th>관리</th>
+            <th>점검유형</th><th>담당자</th><th>단장님</th><th>관리</th>
           </tr>
         </thead>
         <tbody id="site-tbl-body"></tbody>
@@ -306,7 +328,7 @@ tr:hover td{background:#f8fafc;}
         </select>
       </div>
       <div class="fg"><label>👤 담당자</label><input type="text" id="inp-manager" placeholder="담당자 이름" maxlength="30"></div>
-      <div class="fg"><label>📝 비고/메모</label><textarea id="inp-memo" placeholder="비고 또는 메모 (최대 200자)" maxlength="200"></textarea></div>
+      <div class="fg"><label>📝 단장님</label><textarea id="inp-memo" placeholder="단장님 (연락처)" maxlength="200"></textarea></div>
     </div>
     <div class="modal-ft">
       <button class="btn-cancel" onclick="closeModal('form-modal')">취소</button>

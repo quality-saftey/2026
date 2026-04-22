@@ -729,16 +729,17 @@ function renderSiteCards(){
   }
   grid.innerHTML = sites.map(s=>{
     const cnt = events.filter(e=>e.siteId===s.id).length;
-    // 전화번호와 이름 합쳐서 보여주기
+    
     const directorInfo = s.director || '단장님 미상';
-    const phoneInfo = s.phone ? `(${escapeHTML(s.phone)})` : '';
+    // 📞 전화걸기 링크(tel:) 적용
+    const phoneInfo = s.phone ? `(<a href="tel:${escapeHTML(s.phone)}" style="color:white; text-decoration:underline;">${escapeHTML(s.phone)}</a>)` : '';
     
     return `<div class="site-card" style="background:${s.color}">
       <div class="site-card-name">
         ${s.category ? `<span style="font-size:11px;background:rgba(255,255,255,0.2);padding:2px 6px;border-radius:4px;vertical-align:middle;margin-right:4px;">${escapeHTML(s.category)}</span>` : ''}
         🏗️ ${escapeHTML(s.name)}
       </div>
-      <div style="font-size:12px;opacity:0.9;margin-bottom:4px;">🧑‍💼 ${escapeHTML(directorInfo)} ${phoneInfo}</div>
+      <div style="font-size:13px;opacity:0.95;margin-bottom:4px;font-weight:bold;">🧑‍💼 ${escapeHTML(directorInfo)} ${phoneInfo}</div>
       <div style="font-size:12px;opacity:0.9;margin-bottom:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escapeHTML(s.location||'위치 정보 없음')}">📍 ${escapeHTML(s.location||'위치 정보 없음')}</div>
       <div class="site-card-count">등록된 일정: ${cnt}건</div>
       <div class="site-card-btns">
@@ -865,12 +866,14 @@ window.showDetail = function(id, e){
   e.stopPropagation(); curDetailId=id;
   const ev = events.find(v=>v.id===id); if(!ev) return;
   const s = getSite(ev.siteId);
+  
   const rowStyle = "display:flex; padding:12px 20px; border-bottom:1px solid #f1f5f9;";
   const dlStyle = "width:90px; font-weight:bold; color:#64748b; font-size:13px; flex-shrink:0;";
   const dvStyle = "font-size:14px; color:#1e293b; flex:1;";
   
   const directorInfo = s?.director || '-';
-  const phoneInfo = s?.phone ? `(${escapeHTML(s.phone)})` : '';
+  // 📞 전화걸기 링크(tel:) 적용
+  const phoneInfo = s?.phone ? `(<a href="tel:${escapeHTML(s.phone)}" style="color:#3b82f6; font-weight:bold; text-decoration:none;">${escapeHTML(s.phone)}</a>)` : '';
   
   SS('detail-body').innerHTML=`
     <div style="background:#f8fafc;padding:12px 20px;border-bottom:1px solid #e2e8f0;">
@@ -884,6 +887,7 @@ window.showDetail = function(id, e){
     <div style="${rowStyle}"><div style="${dlStyle}">🔍 유형</div><div style="${dvStyle}"><span class="insp-cell t-${ev.type}" style="margin:0;">${escapeHTML(ev.type)}</span></div></div>
     <div style="${rowStyle}"><div style="${dlStyle}">👤 담당자</div><div style="${dvStyle}">${escapeHTML(ev.manager||'-')}</div></div>
     <div style="${rowStyle}border:none;"><div style="${dlStyle}">📝 비고</div><div style="${dvStyle};line-height:1.5;">${escapeHTML(ev.memo||'-').replace(/\n/g, '<br>')}</div></div>`;
+    
   SS('detail-modal').classList.add('show');
 };
 

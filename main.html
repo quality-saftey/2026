@@ -240,6 +240,7 @@ tr:hover td{background:#f8fafc;}
         </div>
         <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
         <button class="nav-btn" onclick="changeYear(1)">다음년도 ▶</button>
+        <button class="btn-excel" style="background:#f39c12; margin-right: 5px;" onclick="exportAnnualImage()">📸 이미지 저장</button>
       </div>
     </div>
     <div class="annual-wrap">
@@ -402,6 +403,8 @@ tr:hover td{background:#f8fafc;}
 
 <!-- SheetJS -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1041,6 +1044,43 @@ window.exportExcel = function(){
 };
 
 window.closeModal = id => SS(id).classList.remove('show');
+  // ============================================
+// 연간 일정표 이미지(PNG) 다운로드 기능
+// ============================================
+window.exportAnnualImage = function() {
+  const tableTarget = SS('annual-table');
+  
+  if (!tableTarget) {
+    alert("저장할 표가 없습니다.");
+    return;
+  }
+
+  // 캡처하는 동안 안내 메시지 띄우기
+  toast('이미지를 생성 중입니다. 잠시만 기다려주세요... ⏳');
+
+  // html2canvas 실행 (표 영역만 캡처)
+  html2canvas(tableTarget, {
+    scale: 2, // 2배율로 캡처하여 고화질 유지
+    backgroundColor: "#ffffff", // 배경색 흰색
+    logging: false
+  }).then(canvas => {
+    // 캔버스를 이미지 URL로 변환
+    const imageURI = canvas.toDataURL("image/png");
+    
+    // 가상의 다운로드 링크 만들어서 클릭 발생시키기
+    const link = document.createElement("a");
+    link.href = imageURI;
+    link.download = `연간일정표_${annualYear}년.png`; // 파일명 설정
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast('이미지 저장이 완료되었습니다! 📸');
+  }).catch(err => {
+    console.error("이미지 저장 오류:", err);
+    toast('이미지 저장 중 오류가 발생했습니다. ❌');
+  });
+};
 </script>
 </body>
 </html>

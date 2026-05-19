@@ -227,9 +227,6 @@ tr:hover td{background:#f8fafc;}
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
           <div style="width:12px;height:12px;border-radius:3px;background:#6366f1;margin-right:4px;"></div>비상주
         </div>
-        <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
-          <div style="width:12px;height:12px;border-radius:3px;background:#94a3b8;margin-right:4px;"></div>기타 / 직접입력
-        </div>
       </div>
 
     </div>
@@ -326,7 +323,6 @@ tr:hover td{background:#f8fafc;}
           <option value="특별점검"></option>
           <option value="준공검사"></option>
           <option value="비상주"></option>
-          <option value="기타(자문, 면담 등)"></option>
         </datalist>
       </div>
       <div class="fg"><label>👤 담당자</label><input type="text" id="inp-manager" placeholder="담당자 이름" maxlength="30"></div>
@@ -710,7 +706,7 @@ window.renderAnnual = function(){
           if(cell){
             html += `<td>${cell.map(e=>`
               <div class="insp-cell" style="background:${getTypeColors(e.type).bg}; color:${getTypeColors(e.type).text}; border:1px solid ${getTypeColors(e.type).border};" onclick="showDetail('${e.id}',event)">
-                ${escapeHTML(e.type).replace('점검','').replace('검사','검').replace('(자문, 면담 등)','')}<br>
+                ${escapeHTML(e.type).replace('점검','').replace('검사','검')}<br>
                 <span style="font-size:10px;font-weight:normal;opacity:0.8;">${e.date.slice(5).replace('-','/')}</span>
               </div>`).join('')}</td>`;
           } else {
@@ -757,7 +753,7 @@ window.renderSiteTable = function() {
       <td style="font-weight:bold;">${fmtDate(e.date)}</td>
       <td><span style="background:${hexLight(s?.color||'#ccc')};color:${hexDark(s?.color||'#333')};padding:4px 8px;border-radius:4px;font-size:12px;font-weight:bold;">${escapeHTML(s?.name||'알수없음')}</span></td>
       <td>${escapeHTML(e.pjcode)||'-'}</td>
-      <td><span class="insp-cell" style="margin:0;padding:4px 8px;background:${getTypeColors(e.type).bg};color:${getTypeColors(e.type).text};border:1px solid ${getTypeColors(e.type).border};">${escapeHTML(e.type).replace('(자문, 면담 등)','')}</span></td>
+      <td><span class="insp-cell" style="margin:0;padding:4px 8px;background:${getTypeColors(e.type).bg};color:${getTypeColors(e.type).text};border:1px solid ${getTypeColors(e.type).border};">${escapeHTML(e.type)}</span></td>
       <td>${escapeHTML(e.manager)||'-'}</td>
       <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#64748b;" title="${escapeHTML(e.memo)}">${escapeHTML(e.memo)||'-'}</td>
       <td>

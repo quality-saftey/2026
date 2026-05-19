@@ -508,7 +508,15 @@ function updateFilters() {
   if(managerSelect) {
     const currentManager = managerSelect.value; 
     const managers = new Set();
-    events.forEach(e => { if(e.manager && e.manager.trim() !== '') managers.add(e.manager.trim()); });
+    events.forEach(e => { 
+      if(e.manager && e.manager.trim() !== '') {
+        // 📌 쉼표(,)나 슬래시(/)로 묶인 이름을 1명씩 쪼개서 추가
+        e.manager.split(/[,/]/).forEach(name => {
+          const trimmedName = name.trim();
+          if(trimmedName) managers.add(trimmedName);
+        });
+      } 
+    });
     const sortedManagers = Array.from(managers).sort();
     let htmlM = '<option value="">👤 전체 담당자</option>';
     sortedManagers.forEach(m => htmlM += `<option value="${m}">${escapeHTML(m)}</option>`);
@@ -589,7 +597,12 @@ window.renderCalendar = function() {
   // 📌 [추가됨] 선택한 담당자가 배정된 '모든 현장(siteId)' 목록을 미리 추출
   let allowedSiteIds = null;
   if(managerFilter) {
-    allowedSiteIds = new Set(events.filter(e => e.manager && e.manager.trim() === managerFilter).map(e => e.siteId));
+    allowedSiteIds = new Set(events.filter(e => {
+      if (!e.manager) return false;
+      // 📌 여러 명의 담당자 중, 필터로 선택한 사람이 1명이라도 포함되어 있는지 확인
+      const names = e.manager.split(/[,/]/).map(n => n.trim());
+      return names.includes(managerFilter);
+    }).map(e => e.siteId));
   }
 
   let html='', dc=1, nc=1;

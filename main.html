@@ -1,3 +1,14 @@
+월별 캘린더와 일정 등록 화면에서 **점검유형을 사용자가 직접 입력**할 수 있도록 기능을 수정했습니다.
+
+기존의 기본 항목(사전점검, 정기점검 등)은 **자동 완성(목록에서 선택)**으로 제공되지만, 그 외에 **원하는 텍스트를 자유롭게 직접 타이핑해서 등록**할 수도 있습니다.
+
+또한 사용자가 새롭게 직접 입력한 점검유형들도 **월별 캘린더 상단 필터(🔍 전체 유형)** 목록에 자동으로 수집되어 필터링할 수 있도록 연동해두었습니다. (새로 입력한 유형의 캘린더 표시 색상은 기본 회색 톤으로 통일됩니다.)
+
+아래 완성된 전체 코드를 복사해서 적용해주세요!
+
+---
+
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -202,12 +213,7 @@ tr:hover td{background:#f8fafc;}
       <div style="display:flex; gap:8px;">
         <select id="cal-type-filter" class="search-bar" style="width:auto; padding:6px 10px; margin:0;" onchange="renderCalendar()">
           <option value="">🔍 전체 유형</option>
-          <option value="사전점검">사전점검</option>
-          <option value="정기점검">정기점검</option>
-          <option value="특별점검">특별점검</option>
-          <option value="준공검사">준공검사</option>
-          <option value="비상주">비상주</option>
-          <option value="기타(자문, 면담 등)">기타</option>
+          <!-- 등록된 데이터에 따라 동적 생성됨 -->
         </select>
         <select id="cal-manager-filter" class="search-bar" style="width:auto; padding:6px 10px; margin:0;" onchange="renderCalendar()">
           <option value="">👤 전체 담당자</option>
@@ -215,25 +221,25 @@ tr:hover td{background:#f8fafc;}
         </select>
       </div>
 
-      <!-- ✅ 점검유형 색상 범례 -->
+      <!-- ✅ 점검유형 색상 범례 (주요 항목 위주로 표시, 그 외는 직접 입력 가능 안내) -->
       <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end;">
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
-          <div style="width:12px;height:12px;border-radius:3px;background:#ffc107;margin-right:4px;"></div>사전점검
+          <div style="width:12px;height:12px;border-radius:3px;background:#ffc107;margin-right:4px;"></div>사전
         </div>
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
-          <div style="width:12px;height:12px;border-radius:3px;background:#17a2b8;margin-right:4px;"></div>정기점검
+          <div style="width:12px;height:12px;border-radius:3px;background:#17a2b8;margin-right:4px;"></div>정기
         </div>
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
-          <div style="width:12px;height:12px;border-radius:3px;background:#dc3545;margin-right:4px;"></div>특별점검
+          <div style="width:12px;height:12px;border-radius:3px;background:#dc3545;margin-right:4px;"></div>특별
         </div>
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
-          <div style="width:12px;height:12px;border-radius:3px;background:#28a745;margin-right:4px;"></div>준공검사
+          <div style="width:12px;height:12px;border-radius:3px;background:#28a745;margin-right:4px;"></div>준공
         </div>
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
           <div style="width:12px;height:12px;border-radius:3px;background:#6366f1;margin-right:4px;"></div>비상주
         </div>
         <div style="display:flex;align-items:center;font-size:12px;font-weight:bold;color:#475569;">
-          <div style="width:12px;height:12px;border-radius:3px;background:#94a3b8;margin-right:4px;"></div>기타
+          <div style="width:12px;height:12px;border-radius:3px;background:#94a3b8;margin-right:4px;"></div>기타 / 직접입력
         </div>
       </div>
 
@@ -280,7 +286,7 @@ tr:hover td{background:#f8fafc;}
       <div class="tbl-header">
         <h3 id="site-tbl-title">전체 현장 점검 일정</h3>
         <div style="display:flex; gap:10px; align-items:center;">
-          <input type="text" id="search-input" class="search-bar" style="width:250px; margin-bottom:0;" placeholder="현장명, 담당자, PJ Code, 메모 검색..." onkeyup="renderSiteTable()">
+          <input type="text" id="search-input" class="search-bar" style="width:250px; margin-bottom:0;" placeholder="현장명, 담당자, PJ Code, 점검유형 검색..." onkeyup="renderSiteTable()">
           <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
         </div>
       </div>
@@ -321,16 +327,18 @@ tr:hover td{background:#f8fafc;}
       <div class="fg"><label>📅 날짜 *</label><input type="date" id="inp-date"></div>
       <div class="fg"><label>🏗️ 현장명 *</label><select id="inp-site"></select></div>
       <div class="fg"><label>🔖 PJ Code</label><input type="text" id="inp-pjcode" placeholder="예) 26000" maxlength="50"></div>
-      <div class="fg"><label>🔍 점검유형 *</label>
-        <select id="inp-type">
-          <option value="">유형 선택</option>
-          <option>사전점검</option>
-          <option>정기점검</option>
-          <option>특별점검</option>
-          <option>준공검사</option>
-          <option>비상주</option>
-          <option>기타(자문, 면담 등)</option>
-        </select>
+      <div class="fg">
+        <label>🔍 점검유형 *</label>
+        <!-- 📌 select 대신 직접 입력 가능한 input + datalist로 변경 -->
+        <input type="text" id="inp-type" list="dl-types" placeholder="직접 입력하거나 목록에서 선택하세요" maxlength="30">
+        <datalist id="dl-types">
+          <option value="사전점검"></option>
+          <option value="정기점검"></option>
+          <option value="특별점검"></option>
+          <option value="준공검사"></option>
+          <option value="비상주"></option>
+          <option value="기타(자문, 면담 등)"></option>
+        </datalist>
       </div>
       <div class="fg"><label>👤 담당자</label><input type="text" id="inp-manager" placeholder="담당자 이름" maxlength="30"></div>
       <div class="fg"><label>📝 비고/메모</label><textarea id="inp-memo" placeholder="비고 또는 메모 (최대 200자)" maxlength="200"></textarea></div>
@@ -477,15 +485,14 @@ function hexLight(hex){
 }
 function hexDark(hex){ return hex; }
 
-// 점검 유형별 색상 매핑 함수
+// 점검 유형별 색상 매핑 함수 (매칭 안되는 사용자 직접입력 항목은 기본색상-기타 로 표시)
 function getTypeColors(t){
   if(t === '사전점검') return { bg:'#fff3cd', text:'#856404', border:'#ffeeba', solid:'#ffc107' };
   if(t === '정기점검') return { bg:'#d1ecf1', text:'#0c5460', border:'#bee5eb', solid:'#17a2b8' };
   if(t === '특별점검') return { bg:'#f8d7da', text:'#721c24', border:'#f5c6cb', solid:'#dc3545' };
   if(t === '준공검사') return { bg:'#d4edda', text:'#155724', border:'#c3e6cb', solid:'#28a745' };
   if(t === '비상주')   return { bg:'#e0e7ff', text:'#3730a3', border:'#c7d2fe', solid:'#6366f1' };
-  if(t && t.startsWith('기타')) return { bg:'#f1f5f9', text:'#475569', border:'#cbd5e1', solid:'#94a3b8' };
-  return { bg:'#f1f5f9', text:'#475569', border:'#cbd5e1', solid:'#94a3b8' };
+  return { bg:'#f1f5f9', text:'#475569', border:'#cbd5e1', solid:'#94a3b8' }; // 기본(직접입력, 기타 등)
 }
 
 let sites=[], events=[], curYear=new Date().getFullYear(),
@@ -508,30 +515,33 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'), 3000);
 }
 
-// 📌 데이터 기반 담당자 목록 동적 생성 함수
-function updateManagerFilter() {
-  const select = SS('cal-manager-filter');
-  if(!select) return;
-  const currentVal = select.value; 
-  const managers = new Set();
+// 📌 데이터 기반 담당자 및 점검유형 목록 동적 생성 (캘린더 필터용)
+function updateFilters() {
+  const managerSelect = SS('cal-manager-filter');
+  const typeSelect = SS('cal-type-filter');
   
-  events.forEach(e => {
-    if(e.manager && e.manager.trim() !== '') {
-      managers.add(e.manager.trim());
-    }
-  });
-  
-  const sortedManagers = Array.from(managers).sort();
-  let html = '<option value="">👤 전체 담당자</option>';
-  sortedManagers.forEach(m => {
-    html += `<option value="${m}">${escapeHTML(m)}</option>`;
-  });
-  
-  select.innerHTML = html;
-  
-  // 기존에 선택된 값이 목록에 있으면 유지
-  if(sortedManagers.includes(currentVal)) {
-    select.value = currentVal;
+  if(managerSelect) {
+    const currentManager = managerSelect.value; 
+    const managers = new Set();
+    events.forEach(e => { if(e.manager && e.manager.trim() !== '') managers.add(e.manager.trim()); });
+    const sortedManagers = Array.from(managers).sort();
+    let htmlM = '<option value="">👤 전체 담당자</option>';
+    sortedManagers.forEach(m => htmlM += `<option value="${m}">${escapeHTML(m)}</option>`);
+    managerSelect.innerHTML = htmlM;
+    if(sortedManagers.includes(currentManager)) managerSelect.value = currentManager;
+  }
+
+  if(typeSelect) {
+    const currentType = typeSelect.value;
+    const types = new Set();
+    // 기본 유형 추가 보장
+    ['사전점검','정기점검','특별점검','준공검사','비상주'].forEach(t => types.add(t));
+    events.forEach(e => { if(e.type && e.type.trim() !== '') types.add(e.type.trim()); });
+    const sortedTypes = Array.from(types).sort();
+    let htmlT = '<option value="">🔍 전체 유형</option>';
+    sortedTypes.forEach(t => htmlT += `<option value="${t}">${escapeHTML(t)}</option>`);
+    typeSelect.innerHTML = htmlT;
+    if(sortedTypes.includes(currentType)) typeSelect.value = currentType;
   }
 }
 
@@ -551,7 +561,7 @@ function initFirestore(){
   });
 }
 function refresh(){
-  updateManagerFilter(); // 📌 일정 갱신 시 담당자 목록도 업데이트
+  updateFilters(); // 일정 갱신 시 필터(담당자, 유형) 목록 업데이트
   if(curTab==='calendar') renderCalendar();
   if(curTab==='annual')   renderAnnual();
   if(curTab==='site')     renderSiteTable();
@@ -588,7 +598,6 @@ window.renderCalendar = function() {
   const today=new Date();
   const total=Math.ceil((first+last)/7)*7;
   
-  // 📌 현재 선택된 필터 값 가져오기
   const typeFilter = SS('cal-type-filter') ? SS('cal-type-filter').value : '';
   const managerFilter = SS('cal-manager-filter') ? SS('cal-manager-filter').value : '';
 
@@ -614,7 +623,6 @@ window.renderCalendar = function() {
     }
     const isTod = !other && today.getFullYear()===curYear && today.getMonth()===curMonth && today.getDate()===dn;
     
-    // 📌 해당 날짜의 이벤트 가져온 후 필터 적용
     const dayEvs = events.filter(e => {
       if(e.date !== ds) return false;
       if(typeFilter && e.type !== typeFilter) return false;
@@ -875,7 +883,7 @@ function fillSiteSelect(selId){
 window.saveEvent = async function(){
   const date = SS('inp-date').value;
   const siteId = SS('inp-site').value;
-  const type = SS('inp-type').value;
+  const type = SS('inp-type').value.trim(); // 📌 입력된 값 가져오기
   if(!date || !siteId || !type){
     alert('날짜, 현장명, 점검유형은 필수 입력 항목입니다.'); return;
   }
@@ -1077,3 +1085,4 @@ window.exportAnnualImage = function() {
 </script>
 </body>
 </html>
+```

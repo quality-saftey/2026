@@ -586,6 +586,12 @@ window.renderCalendar = function() {
   const typeFilter = SS('cal-type-filter') ? SS('cal-type-filter').value : '';
   const managerFilter = SS('cal-manager-filter') ? SS('cal-manager-filter').value : '';
 
+  // 📌 [추가됨] 선택한 담당자가 배정된 '모든 현장(siteId)' 목록을 미리 추출
+  let allowedSiteIds = null;
+  if(managerFilter) {
+    allowedSiteIds = new Set(events.filter(e => e.manager && e.manager.trim() === managerFilter).map(e => e.siteId));
+  }
+
   let html='', dc=1, nc=1;
   for(let i=0; i<total; i++){
     const col=i%7;
@@ -611,7 +617,10 @@ window.renderCalendar = function() {
     const dayEvs = events.filter(e => {
       if(e.date !== ds) return false;
       if(typeFilter && e.type !== typeFilter) return false;
-      if(managerFilter && (!e.manager || e.manager.trim() !== managerFilter)) return false;
+      
+      // 📌 [수정됨] 현재 일정의 현장(siteId)이 추출해둔 allowedSiteIds에 포함되어 있는지 확인
+      if(allowedSiteIds && !allowedSiteIds.has(e.siteId)) return false;
+      
       return true;
     });
 
@@ -1006,17 +1015,17 @@ window.uploadData = async function(){
       }
     }
     const existingEvent = events.find(e => e.siteId === site.id && e.date === row.date && e.type === row.type);
-    if(existingEvent) {
-      await setDoc(doc(db,'events',existingEvent.id), {
+      if(existingEvent) {
+       await setDoc(doc(db,'events',existingEvent.id), {
         manager: row.manager,
         pjcode: row.pjcode,
-        memo: '엑셀 데이터로 업데이트됨'
+        memo: ''  // 문구 삭제
       }, { merge: true });
       updatedEvents++;
-    } else {
+       } else {
       await setDoc(doc(db,'events',genId()), {
         date: row.date, siteId: site.id, type: row.type,
-        manager: row.manager, pjcode: row.pjcode, memo: '엑셀 일괄 업로드'
+        manager: row.manager, pjcode: row.pjcode, memo: ''  // 문구 삭제
       });
       addedEvents++;
     }

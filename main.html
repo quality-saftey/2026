@@ -164,33 +164,6 @@ tr:hover td{background:#f8fafc;}
   padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;box-shadow:0 10px 15px rgba(0,0,0,0.1);
   opacity:0;transform:translateY(20px);transition:all 0.3s;z-index:9999;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
-/* =========================================
-   📄 인쇄(PDF 저장) 전용 스타일
-   - 연간표만 깔끔하게 출력, 나머지 UI는 숨김
-   - 색상/배경이 그대로 인쇄되도록 강제
-   ========================================= */
-@media print {
-  /* 인쇄 시 불필요한 요소 숨기기 */
-  .header, .tabs, .cal-top, #sync-status, .toast { display: none !important; }
-  /* 연간표 외 다른 탭(뷰) 숨기기 */
-  body > .content > .view:not(#view-annual) { display: none !important; }
-  #view-annual { display: block !important; }
-  /* 여백·배경 정리 */
-  body { background: white !important; }
-  .content { padding: 0 !important; max-width: 100% !important; }
-  .annual-wrap { overflow: visible !important; }
-  /* 표 색상·배경 그대로 인쇄 (브라우저 기본은 배경 생략하므로 강제) */
-  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  .annual-table { box-shadow: none !important; min-width: 0 !important; width: 100% !important; font-size: 9px !important; }
-  .annual-table td { padding: 3px 2px !important; }
-  .insp-cell { box-shadow: none !important; }
-  /* 표가 페이지 중간에서 잘리지 않도록 */
-  .annual-table tr { page-break-inside: avoid; }
-  /* 인쇄 제목 표시용 */
-  #print-title { display: block !important; text-align: center; font-size: 16px; font-weight: bold; color: #1a3a5c; margin: 0 0 10px 0; padding: 8px; }
-}
-/* 평소엔 인쇄용 제목 숨김 */
-#print-title { display: none; }
 </style>
 </head>
 <body>
@@ -293,10 +266,9 @@ tr:hover td{background:#f8fafc;}
         </div>
         <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
         <button class="nav-btn" onclick="changeYear(1)">다음년도 ▶</button>
-        <button class="btn-excel" style="background:#e74c3c; margin-right: 5px;" onclick="exportAnnualPDF()">📄 PDF 저장</button>
+        <button class="btn-excel" style="background:#f39c12; margin-right: 5px;" onclick="exportAnnualImage()">📸 이미지 저장</button>
       </div>
     </div>
-    <div id="print-title"></div>
     <div class="annual-wrap">
       <table class="annual-table" id="annual-table"></table>
     </div>
@@ -1207,20 +1179,30 @@ window.exportExcel = function(){
   toast('엑셀(CSV) 파일이 다운로드 되었습니다. 📥');
 };
 window.closeModal = id => SS(id).classList.remove('show');
-
-// 📄 [신규] 연간 일정표를 'PDF로 저장' — 브라우저 인쇄 기능 사용
-//   화면의 표 디자인을 그대로 유지하면서, 글자는 진짜 텍스트로 출력됨(복사·검색 가능).
-//   사용자가 인쇄 대화상자에서 '대상: PDF로 저장'을 선택하면 됨.
-window.exportAnnualPDF = function(){
-  // 인쇄용 제목을 현재 연도/필터 기준으로 채워줌
-  const titleEl = SS('print-title');
-  if(titleEl){
-    const totalText = SS('annual-title') ? SS('annual-title').textContent : `${annualYear}년 일정`;
-    titleEl.textContent = `${annualYear}년 현장점검 일정`;
+window.exportAnnualImage = function() {
+  const tableTarget = SS('annual-table');
+  if (!tableTarget) {
+    alert("저장할 표가 없습니다.");
+    return;
   }
-  toast('인쇄 창에서 "PDF로 저장"을 선택하세요 📄');
-  // 약간의 지연 후 인쇄(토스트가 인쇄에 안 잡히도록)
-  setTimeout(() => { window.print(); }, 300);
+  toast('이미지를 생성 중입니다. 잠시만 기다려주세요... ⏳');
+  html2canvas(tableTarget, {
+    scale: 2, 
+    backgroundColor: "#ffffff", 
+    logging: false
+  }).then(canvas => {
+    const imageURI = canvas.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.href = imageURI;
+    link.download = `연간일정표_${annualYear}년.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast('이미지 저장이 완료되었습니다! 📸');
+  }).catch(err => {
+    console.error("이미지 저장 오류:", err);
+    toast('이미지 저장 중 오류가 발생했습니다. ❌');
+  });
 };
 </script>
 </body>

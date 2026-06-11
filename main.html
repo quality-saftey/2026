@@ -647,17 +647,6 @@ window.renderCalendar = function() {
   const typeFilter = SS('cal-type-filter') ? SS('cal-type-filter').value : '';
   const managerFilter = SS('cal-manager-filter') ? SS('cal-manager-filter').value : '';
 
-  // 📌 [추가됨] 선택한 담당자가 배정된 '모든 현장(siteId)' 목록을 미리 추출
-  let allowedSiteIds = null;
-  if(managerFilter) {
-    allowedSiteIds = new Set(events.filter(e => {
-      if (!e.manager) return false;
-      // 📌 여러 명의 담당자 중, 필터로 선택한 사람이 1명이라도 포함되어 있는지 확인
-      const names = e.manager.split(/[,/]/).map(n => n.trim());
-      return names.includes(managerFilter);
-    }).map(e => e.siteId));
-  }
-
   let html='', dc=1, nc=1;
   for(let i=0; i<total; i++){
     const col=i%7;
@@ -683,10 +672,15 @@ window.renderCalendar = function() {
     const dayEvs = events.filter(e => {
       if(e.date !== ds) return false;
       if(typeFilter && e.type !== typeFilter) return false;
-      
-      // 📌 [수정됨] 현재 일정의 현장(siteId)이 추출해둔 allowedSiteIds에 포함되어 있는지 확인
-      if(allowedSiteIds && !allowedSiteIds.has(e.siteId)) return false;
-      
+
+      // 📌 [수정됨] 현장이 아니라 '이 일정의 담당자'를 직접 확인
+      //   쉼표(,)·슬래시(/)로 여러 명이면 그중에 선택한 담당자가 있는지 검사
+      if(managerFilter){
+        if(!e.manager) return false;
+        const names = e.manager.split(/[,/]/).map(n => n.trim());
+        if(!names.includes(managerFilter)) return false;
+      }
+
       return true;
     });
 

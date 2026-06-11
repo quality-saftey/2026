@@ -164,6 +164,33 @@ tr:hover td{background:#f8fafc;}
   padding:12px 24px;border-radius:10px;font-size:14px;font-weight:bold;box-shadow:0 10px 15px rgba(0,0,0,0.1);
   opacity:0;transform:translateY(20px);transition:all 0.3s;z-index:9999;pointer-events:none;}
 .toast.show{opacity:1;transform:translateY(0);}
+/* =========================================
+   📄 인쇄(PDF 저장) 전용 스타일
+   - 연간표만 깔끔하게 출력, 나머지 UI는 숨김
+   - 색상/배경이 그대로 인쇄되도록 강제
+   ========================================= */
+@media print {
+  /* 인쇄 시 불필요한 요소 숨기기 */
+  .header, .tabs, .cal-top, #sync-status, .toast { display: none !important; }
+  /* 연간표 외 다른 탭(뷰) 숨기기 */
+  body > .content > .view:not(#view-annual) { display: none !important; }
+  #view-annual { display: block !important; }
+  /* 여백·배경 정리 */
+  body { background: white !important; }
+  .content { padding: 0 !important; max-width: 100% !important; }
+  .annual-wrap { overflow: visible !important; }
+  /* 표 색상·배경 그대로 인쇄 (브라우저 기본은 배경 생략하므로 강제) */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .annual-table { box-shadow: none !important; min-width: 0 !important; width: 100% !important; font-size: 9px !important; }
+  .annual-table td { padding: 3px 2px !important; }
+  .insp-cell { box-shadow: none !important; }
+  /* 표가 페이지 중간에서 잘리지 않도록 */
+  .annual-table tr { page-break-inside: avoid; }
+  /* 인쇄 제목 표시용 */
+  #print-title { display: block !important; text-align: center; font-size: 16px; font-weight: bold; color: #1a3a5c; margin: 0 0 10px 0; padding: 8px; }
+}
+/* 평소엔 인쇄용 제목 숨김 */
+#print-title { display: none; }
 </style>
 </head>
 <body>
@@ -269,6 +296,7 @@ tr:hover td{background:#f8fafc;}
         <button class="btn-excel" style="background:#e74c3c; margin-right: 5px;" onclick="exportAnnualPDF()">📄 PDF 저장</button>
       </div>
     </div>
+    <div id="print-title"></div>
     <div class="annual-wrap">
       <table class="annual-table" id="annual-table"></table>
     </div>
@@ -424,9 +452,6 @@ tr:hover td{background:#f8fafc;}
 <!-- SheetJS -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-<!-- 📌 PDF 저장용 (텍스트가 살아있는 PDF 생성) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1182,170 +1207,20 @@ window.exportExcel = function(){
   toast('엑셀(CSV) 파일이 다운로드 되었습니다. 📥');
 };
 window.closeModal = id => SS(id).classList.remove('show');
-// 📌 한글 폰트 캐시 (한 번 받아두면 재사용)
-let _koreanFontBase64 = null;
-async function loadKoreanFont(){
-  if(_koreanFontBase64) return _koreanFontBase64;
-  // 구글 폰트 공식 저장소의 나눔고딕 (CORS 허용됨)
-  const FONT_URL = "https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf";
-  const res = await fetch(FONT_URL);
-  if(!res.ok) throw new Error('폰트 다운로드 실패');
-  const buf = await res.arrayBuffer();
-  // ArrayBuffer → base64 (청크 단위로 변환해 스택 초과 방지)
-  let binary = '';
-  const bytes = new Uint8Array(buf);
-  const chunk = 0x8000;
-  for(let i=0; i<bytes.length; i+=chunk){
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunk));
+
+// 📄 [신규] 연간 일정표를 'PDF로 저장' — 브라우저 인쇄 기능 사용
+//   화면의 표 디자인을 그대로 유지하면서, 글자는 진짜 텍스트로 출력됨(복사·검색 가능).
+//   사용자가 인쇄 대화상자에서 '대상: PDF로 저장'을 선택하면 됨.
+window.exportAnnualPDF = function(){
+  // 인쇄용 제목을 현재 연도/필터 기준으로 채워줌
+  const titleEl = SS('print-title');
+  if(titleEl){
+    const totalText = SS('annual-title') ? SS('annual-title').textContent : `${annualYear}년 일정`;
+    titleEl.textContent = `${annualYear}년 현장점검 일정`;
   }
-  _koreanFontBase64 = btoa(binary);
-  return _koreanFontBase64;
-}
-
-// 📌 hex 색상 → [r,g,b] 배열 (autoTable fillColor용)
-function hexToRgb(hex){
-  if(!hex || hex[0] !== '#') return [255,255,255];
-  return [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-}
-
-// 📌 [신규] 연간 일정표를 '텍스트가 살아있는 PDF'로 저장
-//   - html2canvas(이미지) 대신 jsPDF + autoTable로 표를 직접 그림 → 글자 복사·검색 가능
-window.exportAnnualPDF = async function(){
-  if(typeof window.jspdf === 'undefined'){
-    toast('PDF 모듈을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요. ❌');
-    return;
-  }
-  toast('PDF를 생성 중입니다. 폰트를 불러오는 중... ⏳');
-
-  // 1) 현재 화면과 동일한 필터 조건으로 데이터 재구성
-  const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-  const searchInput = SS('annual-search-input');
-  const searchKeyword = searchInput ? searchInput.value.toLowerCase().trim() : '';
-  const selCategory = SS('annual-category-filter') ? SS('annual-category-filter').value : '';
-  const selType = SS('annual-type-filter') ? SS('annual-type-filter').value : '';
-
-  let fSites = sites;
-  if(selCategory) fSites = fSites.filter(s => (s.category||'미지정') === selCategory);
-  if(searchKeyword) fSites = fSites.filter(s => s.name.toLowerCase().includes(searchKeyword));
-  // 점검 대상(사전·정기·특별 보유) 현장만
-  fSites = fSites.filter(s =>
-    events.some(e => e.siteId===s.id && e.date && e.date.startsWith(`${annualYear}-`) && isCountable(e.type))
-  );
-
-  if(!fSites.length){ toast('저장할 현장이 없습니다. ❌'); return; }
-
-  // 월별 건수 계산 (화면과 동일 로직)
-  const monthlyCounts = Array(12).fill(0);
-  fSites.forEach(site => {
-    let cEvents = events.filter(e => e.siteId===site.id && e.date && e.date.startsWith(`${annualYear}-`) && isCountable(e.type));
-    if(selType && selType!=='core') cEvents = cEvents.filter(e => (e.type||'').trim()===selType);
-    const byType = {};
-    cEvents.forEach(e => { (byType[e.type]=byType[e.type]||[]).push(e); });
-    Object.values(byType).forEach(list => {
-      groupConsecutive(list).forEach(g => {
-        const mi = parseInt(g.startDate.slice(5,7))-1;
-        if(mi>=0&&mi<12) monthlyCounts[mi]++;
-      });
-    });
-  });
-  const totalCount = monthlyCounts.reduce((a,b)=>a+b,0);
-
-  // 분류별 그룹화
-  const catOrder = ['공공','주택','민간','미지정'];
-  const grouped = { '공공':[], '주택':[], '민간':[], '미지정':[] };
-  fSites.forEach(s => {
-    let c = s.category;
-    if(!c || !catOrder.includes(c)) c='미지정';
-    grouped[c].push(s);
-  });
-
-  // autoTable body 구성 (rowspan으로 분류·현장명 병합)
-  const body = [];
-  catOrder.forEach(cat => {
-    const catSites = grouped[cat];
-    if(!catSites.length) return;
-    // 현장별 행 데이터
-    const catRows = [];
-    catSites.forEach(site => {
-      const rows = buildSiteRows(site, annualYear, selType); // [ [월0셀, 월1셀, ...], ... ]
-      rows.forEach((row, rIndex) => {
-        const cells = [];
-        // 현장명 (현장의 첫 행에만, rowspan)
-        if(rIndex===0){
-          cells.push({ content: site.name, rowSpan: rows.length,
-            styles:{ fillColor: hexToRgb(site.color), textColor:[255,255,255], fontStyle:'bold', halign:'left', valign:'middle' } });
-        }
-        // 12개월 셀
-        row.forEach(cell => {
-          if(cell){
-            const txt = cell.map(g => `${g.type.replace('점검','').replace('검사','검')} ${groupDateLabel(g)}`).join('\n');
-            cells.push({ content: txt, styles:{ fontSize:7, halign:'center', valign:'middle' } });
-          } else {
-            cells.push({ content:'', styles:{} });
-          }
-        });
-        catRows.push({ cells, isFirstOfCat:false });
-      });
-    });
-    // 분류 셀 (분류의 첫 행에만, rowspan = 분류 전체 행수)
-    if(catRows.length){
-      const catColor = cat==='공공'?[41,128,185]:cat==='주택'?[39,174,96]:cat==='민간'?[142,68,173]:[127,140,141];
-      catRows[0].cells.unshift({ content:`${cat}\n(${catSites.length}EA)`, rowSpan: catRows.length,
-        styles:{ fillColor: catColor, textColor:[255,255,255], fontStyle:'bold', halign:'center', valign:'middle', fontSize:8 } });
-      catRows.forEach(r => body.push(r.cells));
-    }
-  });
-
-  try{
-    const { jsPDF } = window.jspdf;
-    // 가로 방향 A4 (표가 넓으므로)
-    const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:'a4' });
-
-    // 한글 폰트 임베드 (normal + bold 슬롯 모두 같은 폰트로 → 굵은 셀도 한글 정상 출력)
-    const fontB64 = await loadKoreanFont();
-    doc.addFileToVFS('NanumGothic.ttf', fontB64);
-    doc.addFont('NanumGothic.ttf', 'NanumGothic', 'normal');
-    doc.addFont('NanumGothic.ttf', 'NanumGothic', 'bold');
-    doc.setFont('NanumGothic');
-
-    // 제목
-    doc.setFontSize(14);
-    doc.text(`${annualYear}년 현장점검 일정 (총 ${totalCount}건)`, 14, 14);
-
-    // 헤더: [분류, 현장명, 1월~12월] + 월별 건수 행
-    const head = [
-      ['분류','현장명', ...months],
-      ['','', ...monthlyCounts.map(c => c>0 ? `${c}건` : '-')]
-    ];
-
-    doc.autoTable({
-      startY: 20,
-      head: head,
-      body: body,
-      theme: 'grid',
-      styles: { font:'NanumGothic', fontSize:7, cellPadding:1.5, lineColor:[200,200,200], lineWidth:0.1, textColor:[40,40,40], overflow:'linebreak' },
-      headStyles: { font:'NanumGothic', fillColor:[26,58,92], textColor:[255,255,255], fontStyle:'normal', halign:'center', valign:'middle', fontSize:8 },
-      columnStyles: {
-        0: { cellWidth: 16 },   // 분류
-        1: { cellWidth: 26 },   // 현장명
-      },
-      margin: { left: 8, right: 8 },
-      didParseCell: function(data){
-        // 월별 건수 행(헤더 2번째 줄) 가운데 정렬 강조
-        if(data.section==='head' && data.row.index===1){
-          data.cell.styles.fillColor=[241,245,249];
-          data.cell.styles.textColor=[37,99,235];
-          data.cell.styles.fontStyle='normal';
-        }
-      }
-    });
-
-    doc.save(`연간일정표_${annualYear}년.pdf`);
-    toast('PDF 저장이 완료되었습니다! 📄');
-  }catch(err){
-    console.error('PDF 저장 오류:', err);
-    toast('PDF 저장 중 오류가 발생했습니다. (네트워크/폰트 확인) ❌');
-  }
+  toast('인쇄 창에서 "PDF로 저장"을 선택하세요 📄');
+  // 약간의 지연 후 인쇄(토스트가 인쇄에 안 잡히도록)
+  setTimeout(() => { window.print(); }, 300);
 };
 </script>
 </body>

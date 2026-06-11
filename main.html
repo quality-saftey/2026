@@ -255,6 +255,12 @@ tr:hover td{background:#f8fafc;}
             <option value="민간">민간</option>
             <option value="미지정">미지정</option>
           </select>
+          <select id="annual-type-filter" class="search-bar" style="width:120px; margin-bottom:0; cursor:pointer;" onchange="renderAnnual()">
+            <option value="">전체 점검</option>
+            <option value="사전점검">사전점검</option>
+            <option value="정기점검">정기점검</option>
+            <option value="특별점검">특별점검</option>
+          </select>
           <input type="text" id="annual-search-input" class="search-bar" style="width:160px; margin-bottom:0;" placeholder="🔍 현장명 검색..." onkeyup="renderAnnual()">
         </div>
         <button class="btn-add" onclick="openAddModal()">+ 일정 추가</button>
@@ -470,6 +476,52 @@ function hexLight(hex){
 }
 function hexDark(hex){ return hex; }
 
+// 📌 [추가] 월별 '현장 점검 건수'에 포함시킬 점검유형 (이 3개만 카운트)
+const COUNTABLE_TYPES = ['사전점검','정기점검','특별점검'];
+function isCountable(type){ return COUNTABLE_TYPES.includes((type||'').trim()); }
+
+// 📌 [추가] 날짜 문자열(YYYY-MM-DD)에 일수를 더한 새 날짜 문자열 반환
+function addDays(ds, n){
+  const d = new Date(ds + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// 📌 [추가] 같은 현장+같은 유형의 '연속된 날짜' 일정들을 하나의 그룹으로 묶음
+//   - 반환: { type, manager, pjcode, memo, startDate, endDate, ids:[연속에 포함된 모든 이벤트id], firstId }
+function groupConsecutive(evList){
+  // 날짜순 정렬
+  const sorted = [...evList].sort((a,b)=> a.date.localeCompare(b.date));
+  const groups = [];
+  for(const e of sorted){
+    const last = groups.length ? groups[groups.length-1] : null;
+    // 직전 그룹과 '같은 유형'이고 '바로 다음날'이면 이어붙이기
+    if(last && last.type === e.type && addDays(last.endDate, 1) === e.date){
+      last.endDate = e.date;
+      last.ids.push(e.id);
+    } else {
+      groups.push({
+        type: e.type, manager: e.manager, pjcode: e.pjcode, memo: e.memo,
+        startDate: e.date, endDate: e.date,
+        ids: [e.id], firstId: e.id
+      });
+    }
+  }
+  return groups;
+}
+
+// 📌 [추가] 그룹의 날짜 표시 라벨 생성 (단일: '3/30', 연속: '3/30~31' / 월 넘어가면 '3/30~4/1')
+function groupDateLabel(g){
+  const s = g.startDate, en = g.endDate;
+  const sLabel = `${parseInt(s.slice(5,7))}/${parseInt(s.slice(8,10))}`;
+  if(s === en) return sLabel;
+  const sameMonth = s.slice(0,7) === en.slice(0,7);
+  const eLabel = sameMonth
+    ? `${parseInt(en.slice(8,10))}`                              // 같은 달: 일자만
+    : `${parseInt(en.slice(5,7))}/${parseInt(en.slice(8,10))}`;  // 다른 달: 월/일
+  return `${sLabel}~${eLabel}`;
+}
+
 // 점검 유형별 색상 매핑 함수 (매칭 안되는 사용자 직접입력 항목은 기본색상-기타 로 표시)
 function getTypeColors(t){
   if(t === '사전점검') return { bg:'#fff3cd', text:'#856404', border:'#ffeeba', solid:'#ffc107' };
@@ -660,6 +712,9 @@ window.renderAnnual = function(){
   const searchKeyword = searchInput ? searchInput.value.toLowerCase().trim() : '';
   const categoryFilter = SS('annual-category-filter');
   const selCategory = categoryFilter ? categoryFilter.value : '';
+  // 📌 [추가] 점검유형 필터 (사전/정기/특별 중 선택 시 해당 유형만 표시)
+  const typeFilterEl = SS('annual-type-filter');
+  const selType = typeFilterEl ? typeFilterEl.value : '';
   let filteredSites = sites;
   if(selCategory) {
     filteredSites = filteredSites.filter(s => {
@@ -670,11 +725,32 @@ window.renderAnnual = function(){
   if(searchKeyword) {
     filteredSites = filteredSites.filter(s => s.name.toLowerCase().includes(searchKeyword));
   }
-  const filteredEvents = events.filter(e => filteredSites.some(fs => fs.id === e.siteId));
-  const monthlyCounts = months.map((_, mi) => {
-    return filteredEvents.filter(e => e.date && e.date.startsWith(`${annualYear}-${String(mi+1).padStart(2,'0')}`)).length;
+  // 📌 해당 연도 + 필터된 현장의 이벤트만 추림
+  let filteredEvents = events.filter(e => filteredSites.some(fs => fs.id === e.siteId));
+  // 📌 점검유형 필터가 걸려있으면 그 유형만 남김
+  if(selType){
+    filteredEvents = filteredEvents.filter(e => (e.type||'').trim() === selType);
+  }
+
+  // 📌 [핵심 수정] 월별 건수 = '카운트 대상 유형'을 '연속 그룹'으로 묶은 개수
+  //   현장별·유형별로 연속일정을 묶고, 묶인 그룹의 '시작일이 속한 달'에 +1
+  const monthlyCounts = Array(12).fill(0);
+  let totalCount = 0;
+  filteredSites.forEach(site => {
+    // 이 현장의 (필터 통과) 카운트 대상 이벤트만
+    const cEvents = filteredEvents.filter(e =>
+      e.siteId === site.id && e.date && e.date.startsWith(`${annualYear}-`) && isCountable(e.type)
+    );
+    // 유형별로 나눠서 각각 연속 그룹화
+    const byType = {};
+    cEvents.forEach(e => { (byType[e.type] = byType[e.type] || []).push(e); });
+    Object.values(byType).forEach(list => {
+      groupConsecutive(list).forEach(g => {
+        const mi = parseInt(g.startDate.slice(5,7)) - 1; // 시작일 기준 월
+        if(mi >= 0 && mi < 12){ monthlyCounts[mi]++; totalCount++; }
+      });
+    });
   });
-  const totalCount = monthlyCounts.reduce((a, b) => a + b, 0);
   let html = `
     <tr class="title-row"><td colspan="14">${annualYear}년 현장점검 일정 (총 ${totalCount}건)</td></tr>
     <tr class="month-row">
@@ -703,7 +779,7 @@ window.renderAnnual = function(){
     const catSites = grouped[cat];
     if(catSites.length === 0) return;
     const siteRowsData = catSites.map(site => {
-      const rows = buildSiteRows(site, annualYear);
+      const rows = buildSiteRows(site, annualYear, selType);
       return { site, rows };
     });
     const catTotalRows = siteRowsData.reduce((sum, data) => sum + data.rows.length, 0);
@@ -726,10 +802,10 @@ window.renderAnnual = function(){
         months.forEach((_, mi)=>{
           const cell = row[mi];
           if(cell){
-            html += `<td>${cell.map(e=>`
-              <div class="insp-cell" style="background:${getTypeColors(e.type).bg}; color:${getTypeColors(e.type).text}; border:1px solid ${getTypeColors(e.type).border};" onclick="showDetail('${e.id}',event)">
-                ${escapeHTML(e.type).replace('점검','').replace('검사','검')}<br>
-                <span style="font-size:10px;font-weight:normal;opacity:0.8;">${e.date.slice(5).replace('-','/')}</span>
+            html += `<td>${cell.map(g=>`
+              <div class="insp-cell" style="background:${getTypeColors(g.type).bg}; color:${getTypeColors(g.type).text}; border:1px solid ${getTypeColors(g.type).border};" onclick="showDetail('${g.firstId}',event)">
+                ${escapeHTML(g.type).replace('점검','').replace('검사','검')}<br>
+                <span style="font-size:10px;font-weight:normal;opacity:0.8;">${groupDateLabel(g)}</span>
               </div>`).join('')}</td>`;
           } else {
             html += `<td></td>`;
@@ -741,10 +817,31 @@ window.renderAnnual = function(){
   });
   SS('annual-table').innerHTML=html;
 }
-function buildSiteRows(site, year){
-  const me = Array.from({length:12}, (_,mi)=>
-    events.filter(e => e.siteId===site.id && e.date && e.date.startsWith(`${year}-${String(mi+1).padStart(2,'0')}`))
-  );
+// 📌 [수정] 현장의 연간 셀 데이터 생성
+//   - 같은 유형의 연속 일정을 그룹으로 묶어 한 칸에 1개로 표시 (라벨: 3/30~31 등)
+//   - 셀에는 모든 유형 표시(비상주·면담 등 포함). 단 selType이 지정되면 그 유형만.
+//   - 그룹은 '시작일이 속한 달'의 칸에 배치
+function buildSiteRows(site, year, selType){
+  // 이 현장의 해당 연도 이벤트
+  let evs = events.filter(e => e.siteId===site.id && e.date && e.date.startsWith(`${year}-`));
+  if(selType){
+    evs = evs.filter(e => (e.type||'').trim() === selType);
+  }
+  // 유형별로 나눠 각각 연속 그룹화
+  const byType = {};
+  evs.forEach(e => { (byType[e.type] = byType[e.type] || []).push(e); });
+  const allGroups = [];
+  Object.values(byType).forEach(list => {
+    groupConsecutive(list).forEach(g => allGroups.push(g));
+  });
+  // 월별 버킷에 그룹 배치 (시작일 기준)
+  const me = Array.from({length:12}, ()=>[]);
+  allGroups.forEach(g => {
+    const mi = parseInt(g.startDate.slice(5,7)) - 1;
+    if(mi>=0 && mi<12) me[mi].push(g);
+  });
+  // 각 월 버킷 내 시작일순 정렬
+  me.forEach(arr => arr.sort((a,b)=> a.startDate.localeCompare(b.startDate)));
   const maxRows = Math.max(1, ...me.map(m=>m.length));
   return Array.from({length:maxRows}, (_,ri)=>me.map(m=>m[ri]?[m[ri]]:null));
 }

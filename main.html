@@ -256,6 +256,7 @@ tr:hover td{background:#f8fafc;}
             <option value="미지정">미지정</option>
           </select>
           <select id="annual-type-filter" class="search-bar" style="width:120px; margin-bottom:0; cursor:pointer;" onchange="renderAnnual()">
+            <option value="core" selected>점검 3종</option>
             <option value="">전체 점검</option>
             <option value="사전점검">사전점검</option>
             <option value="정기점검">정기점검</option>
@@ -727,8 +728,13 @@ window.renderAnnual = function(){
   }
   // 📌 해당 연도 + 필터된 현장의 이벤트만 추림
   let filteredEvents = events.filter(e => filteredSites.some(fs => fs.id === e.siteId));
-  // 📌 점검유형 필터가 걸려있으면 그 유형만 남김
-  if(selType){
+  // 📌 점검유형 필터 적용
+  //   - 'core'  : 사전·정기·특별 3종만 (비상주·면담 등 제외)
+  //   - 개별유형 : 그 유형만
+  //   - ''(전체) : 모든 유형
+  if(selType === 'core'){
+    filteredEvents = filteredEvents.filter(e => isCountable(e.type));
+  } else if(selType){
     filteredEvents = filteredEvents.filter(e => (e.type||'').trim() === selType);
   }
 
@@ -824,7 +830,10 @@ window.renderAnnual = function(){
 function buildSiteRows(site, year, selType){
   // 이 현장의 해당 연도 이벤트
   let evs = events.filter(e => e.siteId===site.id && e.date && e.date.startsWith(`${year}-`));
-  if(selType){
+  // 📌 'core'=3종만 / 개별유형=그 유형만 / ''(전체)=모두
+  if(selType === 'core'){
+    evs = evs.filter(e => isCountable(e.type));
+  } else if(selType){
     evs = evs.filter(e => (e.type||'').trim() === selType);
   }
   // 유형별로 나눠 각각 연속 그룹화

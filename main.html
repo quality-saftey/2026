@@ -318,8 +318,8 @@ tr:hover td{background:#f8fafc;}
     <div class="modal-body">
       <input type="hidden" id="edit-id">
       <div class="fg"><label>📅 날짜 *</label><input type="date" id="inp-date"></div>
-      <div class="fg"><label>🏗️ 현장명 *</label><select id="inp-site"></select></div>
-      <div class="fg"><label>🔖 PJ Code</label><input type="text" id="inp-pjcode" placeholder="예) 26000" maxlength="50"></div>
+      <div class="fg"><label>🏗️ 현장명 *</label><select id="inp-site" onchange="onSiteChange()"></select></div>
+      <div class="fg"><label>🔖 PJ Code</label><input type="text" id="inp-pjcode" placeholder="예) 26000" maxlength="50" oninput="this.dataset.auto=''"></div>
       <div class="fg">
         <label>🔍 점검유형 *</label>
         <!-- 📌 select 대신 직접 입력 가능한 input + datalist로 변경 -->
@@ -977,6 +977,7 @@ window.openAddModal = function(){
   if(!sites.length){ alert('먼저 [현장 관리] 탭에서 현장을 추가해주세요.'); return; }
   SS('modal-title').textContent='일정 추가';
   SS('edit-id').value=''; SS('inp-date').value=''; SS('inp-pjcode').value='';
+  SS('inp-pjcode').dataset.auto='1';  // 📌 새 일정은 빈칸 → 현장 선택 시 자동 채움 허용
   SS('inp-type').value=''; SS('inp-manager').value=''; SS('inp-memo').value='';
   fillSiteSelect('');
   SS('form-modal').classList.add('show');
@@ -987,6 +988,8 @@ window.openEditModal = function(id){
   SS('modal-title').textContent='일정 수정';
   SS('edit-id').value=e.id; SS('inp-date').value=e.date;
   SS('inp-pjcode').value=e.pjcode||''; SS('inp-type').value=e.type;
+  // 📌 기존 PJ Code가 비어있을 때만 자동 채움 허용(직접 입력값은 보존)
+  SS('inp-pjcode').dataset.auto = (e.pjcode && e.pjcode.trim()!=='') ? '' : '1';
   SS('inp-manager').value=e.manager||''; SS('inp-memo').value=e.memo||'';
   fillSiteSelect(e.siteId);
   SS('form-modal').classList.add('show');
@@ -996,6 +999,27 @@ function fillSiteSelect(selId){
   SS('inp-site').innerHTML = `<option value="">현장 선택</option>` +
     sites.map(s=>`<option value="${s.id}" ${s.id===selId?'selected':''}>${escapeHTML(s.name)}</option>`).join('');
 }
+
+// 📌 [추가] 현장의 기존 일정에서 PJ Code를 찾아 반환 (없으면 빈 문자열)
+function getSitePjcode(siteId){
+  if(!siteId) return '';
+  // 이 현장의 일정 중 pjcode가 입력된 것을 찾음
+  const ev = events.find(e => e.siteId === siteId && e.pjcode && e.pjcode.trim() !== '');
+  return ev ? ev.pjcode.trim() : '';
+}
+
+// 📌 [추가] 일정 모달에서 현장을 바꿨을 때 호출 → PJ Code 자동 채움
+//   사용자가 이미 직접 입력해둔 값이 있으면 덮어쓰지 않음
+window.onSiteChange = function(){
+  const siteId = SS('inp-site').value;
+  const pjInput = SS('inp-pjcode');
+  const auto = getSitePjcode(siteId);
+  // 현재 칸이 비어있거나, 직전 자동입력값 그대로면 새 값으로 갱신
+  if(pjInput.value.trim() === '' || pjInput.dataset.auto === '1'){
+    pjInput.value = auto;
+    pjInput.dataset.auto = auto ? '1' : '';  // 자동으로 채운 값임을 표시
+  }
+};
 window.saveEvent = async function(){
   const date = SS('inp-date').value;
   const siteId = SS('inp-site').value;

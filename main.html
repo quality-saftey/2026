@@ -188,8 +188,8 @@ tr:hover td{background:#f8fafc;}
   <h1>🏗️ 현장점검 일정 관리</h1>
   <div class="header-right">
     <span class="sync-status err" id="sync-status">⏳ 연결 중...</span>
-    <button class="btn-upload" onclick="openUploadModal()">📤 엑셀 업로드</button>
-    <button class="btn-excel" onclick="exportExcel()">📥 엑셀 추출</button>
+    <button id="btn-excel-upload" class="btn-upload" onclick="openUploadModal()" style="display:none;">📤 엑셀 업로드</button>
+    <button id="btn-excel-export" class="btn-excel" onclick="exportExcel()" style="display:none;">📥 엑셀 추출</button>
     <button id="logoutBtn" style="padding: 6px 12px; background-color: #34495e; color: white; border: 1px solid #7f8c8d; border-radius: 4px; cursor: pointer;"> 로그아웃 </button>
   </div>
 </div>
@@ -467,6 +467,13 @@ onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUserEmail = (user.email || '').toLowerCase();
     isAdmin = (currentUserEmail === ADMIN_EMAIL.toLowerCase());
+    // 📌 [추가] 관리자만 엑셀 업로드/추출 버튼 표시
+    if(isAdmin){
+      const upBtn = document.getElementById('btn-excel-upload');
+      const exBtn = document.getElementById('btn-excel-export');
+      if(upBtn) upBtn.style.display = '';
+      if(exBtn) exBtn.style.display = '';
+    }
     initFirestore();
   } else {
     alert("로그인이 필요합니다!");
@@ -1117,6 +1124,7 @@ window.editFromDetail = () => openEditModal(curDetailId);
 window.deleteFromDetail = () => { delEvent(curDetailId); closeModal('detail-modal'); };
 /* 엑셀 업로드 */
 window.openUploadModal = function(){
+  if(!isAdmin){ alert('엑셀 업로드는 관리자만 가능합니다.'); return; }
   SS('upload-preview').style.display='none';
   SS('btn-upload-confirm').style.display='none';
   SS('file-input').value='';
@@ -1229,6 +1237,7 @@ window.uploadData = async function(){
   toast(`🎉 현장 신규 ${addedSites}건, 일정 추가 ${addedEvents}건, 업데이트 ${updatedEvents}건 완료!`);
 };
 window.exportExcel = function(){
+  if(!isAdmin){ alert('엑셀 추출은 관리자만 가능합니다.'); return; }
   if(!events.length){ alert("추출할 데이터가 없습니다."); return; }
   let csv = '\uFEFF날짜,현장명,PJ Code,점검유형,담당자,비고\n';
   [...events].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{

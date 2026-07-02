@@ -85,6 +85,23 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f4f7fa;color:#333;}
   cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;
   font-weight:bold;transition:0.2s;}
 .ev-tag:hover{filter:brightness(0.95);transform:scale(1.02);}
+/* 📌 [추가] 최근 3일 내 추가·수정된 일정 강조 (빨간 테두리 + 깜빡임 + NEW 배지) */
+.ev-tag.recently-changed{
+  border:2px solid #ef4444 !important;
+  box-shadow:0 0 0 1px #ef4444;
+  animation:blinkChanged 1.2s ease-in-out infinite;
+  position:relative;
+}
+.ev-tag.recently-changed::after{
+  content:'NEW';
+  position:absolute;top:-6px;right:-4px;
+  background:#ef4444;color:white;font-size:7px;font-weight:bold;
+  padding:1px 3px;border-radius:6px;line-height:1;letter-spacing:0.3px;
+}
+@keyframes blinkChanged{
+  0%,100%{ box-shadow:0 0 0 1px #ef4444; }
+  50%{ box-shadow:0 0 6px 2px rgba(239,68,68,0.6); }
+}
 /* 연간표 및 테이블 */
 .annual-wrap{overflow-x:auto;}
 .annual-table{width:100%;border-collapse:collapse;min-width:1000px;
@@ -439,9 +456,17 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 const auth = getAuth(app);
+
+// 📌 [추가] 관리자 이메일 (이 계정으로 로그인해야 현장 '삭제' 가능)
+const ADMIN_EMAIL = "jinhee.kang@haeahn.com";
+let currentUserEmail = null;   // 현재 로그인한 사용자 이메일
+let isAdmin = false;           // 관리자 여부
+
 // 로그인 체커
 onAuthStateChanged(auth, (user) => {
   if (user) {
+    currentUserEmail = (user.email || '').toLowerCase();
+    isAdmin = (currentUserEmail === ADMIN_EMAIL.toLowerCase());
     initFirestore();
   } else {
     alert("로그인이 필요합니다!");
@@ -643,6 +668,9 @@ window.renderCalendar = function() {
   const prevLast=new Date(curYear,curMonth,0).getDate();
   const today=new Date();
   const total=Math.ceil((first+last)/7)*7;
+  // 📌 [추가] 최근 3일 기준 시각 (updatedAt이 이 값보다 크면 '최근 변경'으로 강조)
+  const RECENT_MS = 3 * 24 * 60 * 60 * 1000; // 3일
+  const recentThreshold = Date.now() - RECENT_MS;
   
   const typeFilter = SS('cal-type-filter') ? SS('cal-type-filter').value : '';
   const managerFilter = SS('cal-manager-filter') ? SS('cal-manager-filter').value : '';
@@ -688,7 +716,10 @@ window.renderCalendar = function() {
       const s = getSite(e.siteId);
       if(!s) return '';
       const tc = getTypeColors(e.type);
-      return `<span class="ev-tag" style="background:${tc.bg};color:${tc.text};border-left:3px solid ${tc.solid}" onclick="showDetail('${e.id}',event)">${escapeHTML(s.name)} ${escapeHTML(e.type).replace('(자문, 면담 등)','')}</span>`;
+      // 📌 [추가] 최근 3일 내 추가·수정된 일정이면 강조 클래스 부여
+      const isRecent = e.updatedAt && e.updatedAt >= recentThreshold;
+      const recentClass = isRecent ? ' recently-changed' : '';
+      return `<span class="ev-tag${recentClass}" style="background:${tc.bg};color:${tc.text};border-left:3px solid ${tc.solid}" onclick="showDetail('${e.id}',event)">${escapeHTML(s.name)} ${escapeHTML(e.type).replace('(자문, 면담 등)','')}</span>`;
     }).join('');
     
     const cls = ['day-cell', other?'other-month':'', isTod?'today':'', col===0?'sunday':'', col===6?'saturday':''].filter(Boolean).join(' ');
@@ -720,15 +751,26 @@ window.renderAnnual = function(){
   if(searchKeyword) {
     filteredSites = filteredSites.filter(s => s.name.toLowerCase().includes(searchKeyword));
   }
-  // 📌 [추가] 점검 대상 현장만 표시
-  //   해당 연도에 '사전·정기·특별점검'이 1건도 없는 현장은 연간표에서 숨김
-  filteredSites = filteredSites.filter(s =>
-    events.some(e =>
-      e.siteId === s.id &&
-      e.date && e.date.startsWith(`${annualYear}-`) &&
-      isCountable(e.type)
-    )
-  );
+  // 📌 [수정] 점검 대상 현장만 표시 (단, '전체 점검'일 때는 모든 현장 표시)
+  //   - '전체 점검'(selType==='') → 비상주·지원만 있는 현장도 모두 보임
+  //   - '점검 3종'/개별유형 → 해당 유형이 1건도 없는 현장은 숨김
+  if(selType !== ''){
+    filteredSites = filteredSites.filter(s =>
+      events.some(e =>
+        e.siteId === s.id &&
+        e.date && e.date.startsWith(`${annualYear}-`) &&
+        (selType === 'core' ? isCountable(e.type) : (e.type||'').trim() === selType)
+      )
+    );
+  } else {
+    // 전체 점검: 그 해에 '어떤 유형이든' 일정이 1건이라도 있는 현장만 (일정 아예 없는 현장은 여전히 제외)
+    filteredSites = filteredSites.filter(s =>
+      events.some(e =>
+        e.siteId === s.id &&
+        e.date && e.date.startsWith(`${annualYear}-`)
+      )
+    );
+  }
   // 📌 해당 연도 + 필터된 현장의 이벤트만 추림
   let filteredEvents = events.filter(e => filteredSites.some(fs => fs.id === e.siteId));
   // 📌 점검유형 필터 적용
@@ -913,7 +955,7 @@ function renderSiteCards(){
       <div class="site-card-count">등록된 일정: ${cnt}건</div>
       <div class="site-card-btns">
         <button class="btn-ce" onclick="openSiteEdit('${s.id}')">✏️ 수정</button>
-        <button class="btn-cd" onclick="delSite('${s.id}')">🗑️ 삭제</button>
+        ${isAdmin ? `<button class="btn-cd" onclick="delSite('${s.id}')">🗑️ 삭제</button>` : ''}
       </div></div>`;
   }).join('');
 }
@@ -964,6 +1006,11 @@ window.saveSite = async function(){
   toast(editId ? '현장 정보가 수정되었습니다. 💾' : '새 현장이 추가되었습니다. ✨');
 };
 window.delSite = async function(id){
+  // 📌 [추가] 관리자만 현장 삭제 가능 (버튼 우회 호출 방지)
+  if(!isAdmin){
+    alert('현장 삭제는 관리자만 가능합니다.');
+    return;
+  }
   const s = getSite(id);
   const cnt = events.filter(e=>e.siteId===id).length;
   if(!confirm(`[${s?.name}] 현장을 삭제하시겠습니까?\n이 현장에 등록된 ${cnt}건의 일정도 모두 함께 삭제됩니다.`)) return;
@@ -1032,7 +1079,8 @@ window.saveEvent = async function(){
     date, siteId, type,
     pjcode: SS('inp-pjcode').value.trim(),
     manager: SS('inp-manager').value.trim(),
-    memo: SS('inp-memo').value.trim()
+    memo: SS('inp-memo').value.trim(),
+    updatedAt: Date.now()  // 📌 [추가] 추가·수정 시각 기록 (캘린더 '최근 변경' 강조용)
   });
   closeModal('form-modal');
   toast(editId ? '일정이 수정되었습니다. 💾' : '일정이 추가되었습니다. 📅');
